@@ -14,8 +14,11 @@ export default async function handler(req, res) {
   }
 
   // Return only public configuration (no secret keys)
+  // Support both SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY for flexibility
+  const anonKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
   return res.status(200).json({
     supabaseUrl: process.env.SUPABASE_URL,
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    supabaseAnonKey: anonKey,
   });
 }
