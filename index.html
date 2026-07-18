@@ -306,7 +306,7 @@
 
     <script>
         // ========== 전역 변수 ==========
-        let supabase = null;
+        let sb = null; // Supabase client (avoid conflict with global 'supabase' from CDN)
         let supabaseUrl = '';
         let supabaseAnonKey = '';
         let allPlayersCache = [];
@@ -327,7 +327,7 @@
                 }
 
                 // 2. Supabase 클라이언트 생성
-                supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
+                sb = supabase.createClient(supabaseUrl, supabaseAnonKey);
                 
                 // 3. 실시간 구독
                 subscribeToChanges();
@@ -367,7 +367,7 @@
 
         // ========== 실시간 구독 ==========
         function subscribeToChanges() {
-            supabase
+            sb
                 .channel('public:players')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => {
                     loadPlayers();
@@ -377,7 +377,7 @@
 
         // ========== 데이터 로드 ==========
         async function loadPlayers() {
-            const { data, error } = await supabase.from('players').select('*').order('mmr', { ascending: false });
+            const { data, error } = await sb.from('players').select('*').order('mmr', { ascending: false });
             if (error) { console.error(error); showToast('데이터 로드 실패: ' + error.message, 'error'); return; }
             
             allPlayersCache = data || [];
@@ -624,7 +624,8 @@
         }
 
         // 명단에 추가 (DB에 저장된 데이터 활용)
-        async function addSummonerToList(autoParticipate = false) {
+        // 명단에 추가 (DB에 저장된 데이터 활용)
+        window.addSummonerToList = async function(autoParticipate = false) {
             if (!currentSummonerData) return showToast('검색된 소환사가 없습니다.', 'warning');
             
             const btn = autoParticipate ? document.getElementById('addAndMatchBtn') : document.getElementById('addToListBtn');
@@ -633,7 +634,7 @@
             
             try {
                 // 소환사 검색 API가 이미 upsert를 수행하므로, DB에서 최신 데이터 조회
-                const { data: player, error } = await supabase
+                const { data: player, error } = await sb
                     .from('players')
                     .select('*')
                     .eq('puuid', currentSummonerData.puuid)
@@ -646,7 +647,7 @@
                     const currentCount = participatingPlayers.length;
                     if (currentCount >= 10) throw new Error('이미 참가자가 10명입니다.');
                     
-                    await supabase
+                    await sb
                         .from('players')
                         .update({ is_participating: true, lock_team: 'none', assigned_team: null })
                         .eq('id', player.id);
@@ -669,18 +670,19 @@
         }
 
         // ========== 기존 기능들 (수동/일괄 추가) ==========
-        async function addPlayer() {
+        // ========== 기존 기능들 (수동/일괄 추가) ==========
+        window.addPlayer = async function() {
             const name = document.getElementById('playerName').value.trim();
             const mmr = parseInt(document.getElementById('playerMmr').value);
             if (!name || isNaN(mmr)) return showToast('이름과 점수를 확인해주세요.', 'warning');
             
-            await supabase.from('players').insert([{ name, mmr, is_participating: false, lock_team: 'none', assigned_team: null }]);
+            await sb.from('players').insert([{ name, mmr, is_participating: false, lock_team: 'none', assigned_team: null }]);
             document.getElementById('playerName').value = '';
             document.getElementById('playerMmr').value = 1200;
             showToast(`${name} 추가됨`, 'success');
         }
 
-        async function bulkAddPlayers() {
+        window.bulkAddPlayers = async function() {
             const text = document.getElementById('bulkData').value.trim();
             if (!text) return showToast('데이터를 입력해주세요.', 'warning');
             
@@ -695,13 +697,13 @@
                 }
             }
             if (insertData.length > 0) {
-                await supabase.from('players').insert(insertData);
+                await sb.from('players').insert(insertData);
                 showToast(`${insertData.length}명 일괄 등록 완료!`, 'success');
                 document.getElementById('bulkData').value = '';
             }
         }
 
-        async function bulkAddToMatch() {
+        window.bulkAddToMatch = async function() {
             const text = document.getElementById('bulkParticipants').value.trim();
             if (!text) return showToast('참가자 이름을 입력해주세요.', 'warning');
             
@@ -724,25 +726,25 @@
             if (!confirm(msg)) return;
             
             const ids = newParticipants.map(p => p.id);
-            await supabase.from('players').update({ is_participating: true, lock_team: 'none', assigned_team: null }).in('id', ids);
+            await sb.from('players').update({ is_participating: true, lock_team: 'none', assigned_team: null }).in('id', ids);
             document.getElementById('bulkParticipants').value = '';
             showToast(`${ids.length}명 참가자로 추가됨`, 'success');
         }
 
         // ========== 참가자 관리 ==========
-        async function toggleLockTeam(id, team) {
+        window.toggleLockTeam = async function(id, team) {
             const player = allPlayersCache.find(p => p.id === id);
             const newValue = player.lock_team === team ? 'none' : team;
-            await supabase.from('players').update({ lock_team: newValue }).eq('id', id);
+            await sb.from('players').update({ lock_team: newValue }).eq('id', id);
         }
 
-        async function removeFromMatch(id) {
-            await supabase.from('players').update({ is_participating: false, assigned_team: null }).eq('id', id);
+        window.removeFromMatch = async function(id) {
+            await sb.from('players').update({ is_participating: false, assigned_team: null }).eq('id', id);
         }
 
-        async function deletePlayer(id) {
+        window.deletePlayer = async function(id) {
             if (!confirm('삭제하시겠습니까?')) return;
-            await supabase.from('players').delete().eq('id', id);
+            await sb.from('players').delete().eq('id', id);
         }
 
         // ========== MMR 수정 모달 ==========
@@ -756,12 +758,12 @@
             document.getElementById('editModal').classList.remove('active');
         }
 
-        async function saveMmr() {
+        window.saveMmr = async function() {
             const id = document.getElementById('editPlayerId').value;
             const mmr = parseInt(document.getElementById('editMmrInput').value);
             if (isNaN(mmr)) return showToast('올바른 숫자를 입력하세요.', 'warning');
             
-            await supabase.from('players').update({ mmr }).eq('id', id);
+            await sb.from('players').update({ mmr }).eq('id', id);
             closeModal();
             showToast('MMR 수정됨', 'success');
         }
@@ -836,8 +838,8 @@
                 document.getElementById('listA').innerHTML = '<li class="loading-text" style="text-align:center; padding:20px;">매칭 결과를 서버에 기록 중... ⏳</li>';
                 document.getElementById('listB').innerHTML = '<li class="loading-text" style="text-align:center; padding:20px;">매칭 결과를 서버에 기록 중... ⏳</li>';
 
-                await supabase.from('players').update({ assigned_team: 'A' }).in('id', teamAIds);
-                await supabase.from('players').update({ assigned_team: 'B' }).in('id', teamBIds);
+                await sb.from('players').update({ assigned_team: 'A' }).in('id', teamAIds);
+                await sb.from('players').update({ assigned_team: 'B' }).in('id', teamBIds);
                 
                 showToast(`팀 나누기 완료! (MMR 차이: ${bestDiff})`, 'success');
             } catch (err) {
