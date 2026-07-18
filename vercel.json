@@ -8,6 +8,9 @@
     },
     "api/cron/*.js": {
       "maxDuration": 60
+    },
+    "api/config.js": {
+      "maxDuration": 10
     }
   },
   "headers": [

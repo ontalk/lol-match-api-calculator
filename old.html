@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>🎮 게임 팀 매치 계산기</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; color: #333; }
+        h1 { text-align: center; }
+        
+        .manager-box { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef; }
+        .input-group { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+        input[type="text"], input[type="number"] { padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; width: 150px; }
+        textarea { width: 100%; height: 80px; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px; }
+        
+        button { padding: 8px 12px; font-size: 14px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; transition: 0.2s; }
+        .btn-add { background: #0070f3; padding: 10px 20px; } .btn-add:hover { background: #005bb5; }
+        .btn-bulk { background: #8b5cf6; padding: 10px 20px; width: 100%; } .btn-bulk:hover { background: #7c3aed; }
+        .btn-participants { background: #0ea5e9; padding: 10px 20px; width: 100%; } .btn-participants:hover { background: #0284c7; }
+        .btn-move { background: #10b981; font-size: 12px; } .btn-move:hover { background: #059669; }
+        .btn-edit { background: #eab308; font-size: 12px; } .btn-edit:hover { background: #ca8a04; }
+        .btn-remove { background: #6b7280; font-size: 12px; } .btn-remove:hover { background: #4b5563; }
+        .btn-delete { background: #ef4444; font-size: 12px; } .btn-delete:hover { background: #dc2626; }
+        .btn-match { width: 100%; padding: 15px; font-size: 18px; background: #3b82f6; margin-top: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } .btn-match:hover { background: #2563eb; }
+
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .list-box { border: 1px solid #ddd; padding: 0 15px 15px 15px; border-radius: 8px; background: #fff; min-height: 200px; max-height: 400px; overflow-y: auto; }
+        
+        .list-box h3 { margin: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding: 15px 0 10px 0; position: sticky; top: 0; background: #fff; z-index: 10; font-size: 16px; }
+        .list-box h3 span.title-center { flex-grow: 1; text-align: center; } 
+
+        ul { list-style: none; padding: 0; margin: 0; }
+        li { padding: 10px 0; border-bottom: 1px solid #f1f1f1; display: flex; justify-content: space-between; align-items: center; }
+        .player-info { flex-grow: 1; }
+        .btn-group { display: flex; gap: 5px; align-items: center; } 
+        
+        .team-container { display: flex; justify-content: space-between; margin-top: 20px; gap: 20px; }
+        .team-box { border: 1px solid #ccc; padding: 15px; width: 50%; border-radius: 8px; box-sizing: border-box; background: #fdfdfd; min-height: 200px; }
+        .empty-team { text-align: center; color: #9ca3af; margin-top: 30px; font-style: italic; }
+        .loading-text { text-align: center; color: #3b82f6; font-weight: bold; margin-top: 30px; animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <h1>🎮 롤 내전 실시간 팀 매니저</h1>
+
+    <div class="manager-box">
+        <h3 style="text-align: center; margin-top: 0;">👤 선수 등록</h3>
+        <div class="input-group">
+            <input type="text" id="playerName" placeholder="선수 이름">
+            <input type="number" id="playerMmr" placeholder="점수 (예: 10)">
+            <button class="btn-add" onclick="addPlayer()">1명씩 추가</button>
+        </div>
+        <hr style="border: 0; border-top: 1px solid #ddd; margin: 15px 0;">
+        <textarea id="bulkData" placeholder="여러 명 한 번에 등록하려면 여기에 복사+붙여넣기 하세요.&#13;&#10;예시:&#13;&#10;인목 10&#13;&#10;승우 10"></textarea>
+        <button class="btn-bulk" onclick="bulkAddPlayers()">전체 명단 일괄 등록하기</button>
+        <hr style="border: 0; border-top: 1px solid #ddd; margin: 15px 0;">
+        <textarea id="bulkParticipants" placeholder="예시:&#13;&#10;인목&#13;&#10;승우&#13;&#10;또는 인목, 승우, 도딤"></textarea>
+        <button class="btn-participants" onclick="bulkAddToMatch()">참가자 일괄 추가</button>
+    </div>
+
+    <div class="grid-container">
+        <div class="list-box" style="border-top: 4px solid #10b981;">
+            <h3>
+                <span>👈 게임 참가자 (<span id="partCount">0</span>/10명)</span>
+                <button class="btn-remove" onclick="removeAllFromMatch()" style="padding: 4px 8px; font-size: 11px;">모두 취소 ➡️</button>
+            </h3>
+            <ul id="participatingList"></ul>
+        </div>
+        <div class="list-box" style="border-top: 4px solid #6b7280;">
+            <h3><span class="title-center">👉 전체 등록 선수</span></h3>
+            <ul id="dbList"></ul>
+        </div>
+    </div>
+
+    <!-- 팀 매칭 버튼 -->
+    <button class="btn-match" onclick="makeTeams()">🎲 공평하게 5:5 팀 나누기 (모두에게 동기화)</button>
+
+    <!-- 결과 화면 -->
+    <div class="team-container">
+        <div id="teamA_box" class="team-box" style="border-top: 4px solid #3b82f6;">
+            <h3>🔵 A팀 (총점: <span id="scoreA">0</span>)</h3>
+            <ul id="listA"><li class="empty-team">팀을 나누면 여기에 결과가 표시됩니다.</li></ul>
+        </div>
+        <div id="teamB_box" class="team-box" style="border-top: 4px solid #ef4444;">
+            <h3>🔴 B팀 (총점: <span id="scoreB">0</span>)</h3>
+            <ul id="listB"><li class="empty-team">팀을 나누면 여기에 결과가 표시됩니다.</li></ul>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+        const supabaseUrl = 'https://xfxsubglqbwqvchpjksc.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmeHN1YmdscWJ3cXZjaHBqa3NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMzg4NTYsImV4cCI6MjA5ODkxNDg1Nn0.CTxppetZcwGWqLpUtPjnyreIY6zVgIjrvj4DP6w4maw';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        let participatingPlayers = [];
+        let allPlayersCache = [];
+
+        // 실시간 동기화 마법
+        supabase
+            .channel('public:players')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, payload => {
+                loadPlayers();
+            })
+            .subscribe();
+
+        async function loadPlayers() {
+            const { data, error } = await supabase.from('players').select('*').order('mmr', { ascending: false });
+            if (!error && data) {
+                renderLists(data);
+                renderTeams(data); // 🌟 팀 매칭 결과도 DB에서 읽어와서 그립니다!
+            }
+        }
+
+        // 🌟 DB의 assigned_team 값을 읽어와서 아래쪽 A팀/B팀 화면을 채우는 함수
+        function renderTeams(allPlayers) {
+            const teamA = allPlayers.filter(p => p.assigned_team === 'A');
+            const teamB = allPlayers.filter(p => p.assigned_team === 'B');
+
+            teamA.sort((a, b) => b.mmr - a.mmr);
+            teamB.sort((a, b) => b.mmr - a.mmr);
+
+            const sumA = teamA.reduce((sum, p) => sum + p.mmr, 0);
+            const sumB = teamB.reduce((sum, p) => sum + p.mmr, 0);
+
+            document.getElementById('scoreA').innerText = sumA;
+            document.getElementById('scoreB').innerText = sumB;
+
+            if (teamA.length > 0) {
+                document.getElementById('listA').innerHTML = teamA.map(p => `<li>${p.name} (${p.mmr}점)</li>`).join('');
+                document.getElementById('listB').innerHTML = teamB.map(p => `<li>${p.name} (${p.mmr}점)</li>`).join('');
+            } else {
+                document.getElementById('listA').innerHTML = '<li class="empty-team">팀을 나누면 여기에 결과가 표시됩니다.</li>';
+                document.getElementById('listB').innerHTML = '<li class="empty-team">팀을 나누면 여기에 결과가 표시됩니다.</li>';
+            }
+        }
+
+        function renderLists(allPlayers) {
+            allPlayersCache = allPlayers;
+            const dbListElement = document.getElementById('dbList');
+            const partListElement = document.getElementById('participatingList');
+            
+            dbListElement.innerHTML = '';
+            partListElement.innerHTML = '';
+            
+            participatingPlayers = allPlayers.filter(p => p.is_participating === true);
+            const availablePlayers = allPlayers.filter(p => p.is_participating === false || p.is_participating === null);
+
+            document.getElementById('partCount').innerText = participatingPlayers.length;
+
+            participatingPlayers.forEach(p => {
+                partListElement.innerHTML += `
+                    <li>
+                        <span class="player-info"><strong>${p.name}</strong> (${p.mmr}점)</span>
+                        <div class="btn-group">
+                            <select onchange="window.changeLock(${p.id}, this.value)" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                                <option value="none" ${p.lock_team === 'none' || !p.lock_team ? 'selected' : ''}>🎲 랜덤</option>
+                                <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>🔵 A고정</option>
+                                <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>🔴 B고정</option>
+                            </select>
+                            <button class="btn-remove" onclick="removeFromMatch(${p.id})">취소 ➡️</button>
+                        </div>
+                    </li>
+                `;
+            });
+
+            availablePlayers.forEach(p => {
+                dbListElement.innerHTML += `
+                    <li>
+                        <span class="player-info"><strong>${p.name}</strong> (${p.mmr}점)</span>
+                        <div class="btn-group">
+                            <button class="btn-move" onclick="addToMatch(${p.id})">⬅️ 참가</button>
+                            <button class="btn-edit" onclick="editPlayer(${p.id}, '${p.name}', ${p.mmr})">수정</button>
+                            <button class="btn-delete" onclick="deletePlayer(${p.id})">삭제</button>
+                        </div>
+                    </li>
+                `;
+            });
+        }
+
+        window.addToMatch = async function(id) {
+            if (participatingPlayers.length >= 10) return alert("이번 게임 정원(10명)이 이미 꽉 찼습니다!");
+            // 누군가 새로 참가하면 기존에 짜둔 팀이 무의미해지므로 팀 결과를 초기화(null) 합니다.
+            await supabase.from('players').update({ is_participating: true, lock_team: 'none', assigned_team: null }).eq('id', id);
+        }
+
+        window.removeFromMatch = async function(id) {
+            await supabase.from('players').update({ is_participating: false, lock_team: 'none', assigned_team: null }).eq('id', id);
+        }
+
+        window.removeAllFromMatch = async function() {
+            if (participatingPlayers.length === 0) return alert("현재 참가자가 없습니다.");
+            if (!confirm("참가자 10명을 전부 대기실로 돌려보내고 방을 초기화하시겠습니까?")) return;
+            // 🌟 모두 취소할 때 배정된 팀(assigned_team) 기록도 싹 다 지워서 방을 리셋합니다.
+            await supabase.from('players').update({ is_participating: false, lock_team: 'none', assigned_team: null }).eq('is_participating', true);
+        }
+
+        window.changeLock = async function(id, value) {
+            await supabase.from('players').update({ lock_team: value }).eq('id', id);
+        }
+
+        window.editPlayer = async function(id, name, currentMmr) {
+            const newMmrText = prompt(`[${name}] 선수의 새로운 MMR 점수를 입력하세요:`, currentMmr);
+            if (newMmrText === null) return; 
+            const newMmr = parseInt(newMmrText);
+            if (isNaN(newMmr)) return alert("정확한 숫자 점수를 입력해 주세요.");
+            await supabase.from('players').update({ mmr: newMmr }).eq('id', id);
+        }
+
+        window.addPlayer = async function() {
+            const name = document.getElementById('playerName').value.trim();
+            const mmr = parseInt(document.getElementById('playerMmr').value);
+            if (!name || isNaN(mmr)) return alert("이름과 점수를 확인해주세요.");
+            await supabase.from('players').insert([{ name, mmr, is_participating: false, lock_team: 'none', assigned_team: null }]);
+            document.getElementById('playerName').value = '';
+            document.getElementById('playerMmr').value = '';
+        }
+
+        window.bulkAddPlayers = async function() {
+            const text = document.getElementById('bulkData').value.trim();
+            if (!text) return alert("데이터를 입력해 주세요.");
+            const lines = text.split('\n');
+            const insertData = [];
+            for (let line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 2) {
+                    const name = parts[0];
+                    const mmr = parseInt(parts[1]);
+                    if (!isNaN(mmr)) insertData.push({ name, mmr, is_participating: false, lock_team: 'none', assigned_team: null });
+                }
+            }
+            if (insertData.length > 0) {
+                document.getElementById('bulkData').value = '등록 중...';
+                await supabase.from('players').insert(insertData);
+                alert(`${insertData.length}명 등록 완료!`);
+                document.getElementById('bulkData').value = '';
+            }
+        }
+
+        window.bulkAddToMatch = async function() {
+            const text = document.getElementById('bulkParticipants').value.trim();
+            if (!text) return alert("참가자 이름을 입력해주세요.");
+
+            const names = text
+                .split(/[\s,]+/)
+                .map(name => name.trim())
+                .filter(Boolean);
+            const uniqueNames = [...new Set(names)];
+            if (uniqueNames.length === 0) return alert("참가자 이름을 입력해주세요.");
+
+            const playersByName = new Map(allPlayersCache.map(player => [player.name.trim(), player]));
+            const matchedPlayers = uniqueNames
+                .map(name => playersByName.get(name))
+                .filter(Boolean);
+            const missingNames = uniqueNames.filter(name => !playersByName.has(name));
+            const alreadyParticipating = matchedPlayers.filter(player => player.is_participating === true);
+            const newParticipants = matchedPlayers.filter(player => player.is_participating !== true);
+
+            if (matchedPlayers.length === 0) {
+                return alert(`등록된 선수와 일치하는 이름이 없습니다.\n확인 필요: ${missingNames.join(', ')}`);
+            }
+
+            const availableSlots = 10 - participatingPlayers.length;
+            if (availableSlots <= 0) return alert("이미 참가자가 10명입니다.");
+            if (newParticipants.length > availableSlots) {
+                return alert(`추가 가능한 인원은 ${availableSlots}명입니다. 현재 입력은 ${newParticipants.length}명 추가가 필요합니다.`);
+            }
+
+            const message = [
+                `${newParticipants.length}명을 참가자로 추가합니다.`,
+                alreadyParticipating.length ? `이미 참가 중: ${alreadyParticipating.map(player => player.name).join(', ')}` : '',
+                missingNames.length ? `등록 안 됨: ${missingNames.join(', ')}` : ''
+            ].filter(Boolean).join('\n');
+
+            if (!confirm(message)) return;
+
+            const ids = newParticipants.map(player => player.id);
+            if (ids.length > 0) {
+                await supabase
+                    .from('players')
+                    .update({ is_participating: true, lock_team: 'none', assigned_team: null })
+                    .in('id', ids);
+            }
+            document.getElementById('bulkParticipants').value = '';
+        }
+
+        window.deletePlayer = async function(id) {
+            if (!confirm("삭제하시겠습니까?")) return;
+            await supabase.from('players').delete().eq('id', id);
+        }
+
+        // 🌟 팀을 나누고 DB에 결과를 쏘아 올리는 로직
+        window.makeTeams = async function() {
+            if (participatingPlayers.length !== 10) {
+                return alert(`현재 참가자가 ${participatingPlayers.length}명입니다. 정확히 10명이 모여야 팀을 나눌 수 있습니다!`);
+            }
+
+            const totalPlayers = participatingPlayers.length;
+            const targetSize = Math.floor(totalPlayers / 2); 
+            const totalScore = participatingPlayers.reduce((sum, p) => sum + p.mmr, 0);
+
+            const forcedA = participatingPlayers.filter(p => p.lock_team === 'A');
+            const forcedB = participatingPlayers.filter(p => p.lock_team === 'B');
+            const flexible = participatingPlayers.filter(p => p.lock_team === 'none' || !p.lock_team);
+
+            if (forcedA.length > targetSize) return alert(`A팀 고정 인원(${forcedA.length}명)이 팀 정원(${targetSize}명)을 초과했습니다.`);
+            if (forcedB.length > (totalPlayers - targetSize)) return alert(`B팀 고정 인원(${forcedB.length}명)이 팀 정원(${totalPlayers - targetSize}명)을 초과했습니다.`);
+
+            const needA = targetSize - forcedA.length;
+            const forcedASum = forcedA.reduce((sum, p) => sum + p.mmr, 0);
+
+            const totalTens = participatingPlayers.filter(p => p.mmr === 10).length;
+            const minTensInA = Math.floor(totalTens / 2);
+            const maxTensInA = Math.ceil(totalTens / 2);
+
+            let bestDiff = Infinity;
+            let bestCombinations = []; 
+
+            function dfs(index, chosenFlexible, currentFlexibleSum) {
+                if (chosenFlexible.length === needA) {
+                    const finalTeamA = [...forcedA, ...chosenFlexible];
+                    if (totalTens >= 2) {
+                        const tensInA = finalTeamA.filter(p => p.mmr === 10).length;
+                        if (tensInA < minTensInA || tensInA > maxTensInA) return; 
+                    }
+                    const sumA = forcedASum + currentFlexibleSum;
+                    const sumB = totalScore - sumA;
+                    const diff = Math.abs(sumA - sumB);
+
+                    if (diff < bestDiff) {
+                        bestDiff = diff;
+                        bestCombinations = [ finalTeamA ]; 
+                    } else if (diff === bestDiff) {
+                        bestCombinations.push(finalTeamA);
+                    }
+                    return;
+                }
+                if (index >= flexible.length) return;
+
+                chosenFlexible.push(flexible[index]);
+                dfs(index + 1, chosenFlexible, currentFlexibleSum + flexible[index].mmr);
+                chosenFlexible.pop();
+
+                if (flexible.length - (index + 1) >= needA - chosenFlexible.length) {
+                    dfs(index + 1, chosenFlexible, currentFlexibleSum);
+                }
+            }
+
+            dfs(0, [], 0);
+
+            if (bestCombinations.length === 0) {
+                return alert("고정 조건 및 10점 분리 조건을 만족하면서 인원수를 맞출 수 있는 조합이 없습니다.");
+            }
+
+            const randomIndex = Math.floor(Math.random() * bestCombinations.length);
+            const teamA = bestCombinations[randomIndex];
+            const teamB = participatingPlayers.filter(p => !teamA.some(a => a.id === p.id));
+
+            const teamAIds = teamA.map(p => p.id);
+            const teamBIds = teamB.map(p => p.id);
+
+            // 🌟 사람들의 기대감을 위해 1초간 애니메이션 보여주기
+            document.getElementById('listA').innerHTML = '<li class="loading-text">매칭 결과를 서버에 기록 중입니다... ⏳</li>';
+            document.getElementById('listB').innerHTML = '<li class="loading-text">매칭 결과를 서버에 기록 중입니다... ⏳</li>';
+
+            // 🌟 방장이 뽑은 결과를 DB에 업데이트! (업데이트 되면 모든 사람 화면이 자동으로 바뀜)
+            await supabase.from('players').update({ assigned_team: 'A' }).in('id', teamAIds);
+            await supabase.from('players').update({ assigned_team: 'B' }).in('id', teamBIds);
+        }
+
+        loadPlayers();
+    </script>
+</body>
+</html>
