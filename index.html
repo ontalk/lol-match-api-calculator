@@ -306,79 +306,73 @@
 
     <script>
         // ========== 전역 변수 ==========
-        let sb = null; // Supabase client (avoid conflict with global 'supabase' from CDN)
-        let supabaseUrl = '';
-        let supabaseAnonKey = '';
+        let sb = null; 
         let allPlayersCache = [];
         let participatingPlayers = [];
-        let currentSummonerData = null; // 검색된 소환사 데이터 임시 저장
+        let currentSummonerData = null; 
 
         // ========== 초기화 ==========
         async function init() {
             updateStatus('connecting', '설정 로드 중...');
             try {
-                // 1. 런타임에 설정 로드 (/api/config)
-                const config = await loadConfig();
-                supabaseUrl = config.supabaseUrl;
-                supabaseAnonKey = config.supabaseAnonKey;
+                const resp = await fetch('/api/config');
+                if (!resp.ok) throw new Error('설정 로드 실패');
+                const config = await resp.json();
                 
-                if (!supabaseUrl || !supabaseAnonKey) {
-                    throw new Error('Supabase 설정이 없습니다. Vercel Environment Variables를 확인하세요.');
+                if (!config.supabaseUrl || !config.supabaseAnonKey) {
+                    throw new Error('Supabase 설정이 없습니다.');
                 }
 
-                // 2. Supabase 클라이언트 생성
-                sb = supabase.createClient(supabaseUrl, supabaseAnonKey);
+                // 충돌 방지를 위해 window.supabase로 명시적 호출
+                sb = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
                 
-                // 3. 실시간 구독
                 subscribeToChanges();
-                
-                // 4. 초기 데이터 로드
                 await loadPlayers();
                 updateStatus('connected', '연결됨 - 실시간 동기화 활성화');
             } catch (err) {
                 console.error('초기화 실패:', err);
                 updateStatus('error', '연결 실패: ' + err.message);
-                showToast('초기화 실패: ' + err.message, 'error');
+                window.showToast('초기화 실패: ' + err.message, 'error');
             }
         }
 
-        async function loadConfig() {
-            const resp = await fetch('/api/config');
-            if (!resp.ok) throw new Error('설정 로드 실패: ' + resp.status);
-            return resp.json();
-        }
-
-        function updateStatus(state, text) {
+        window.updateStatus = function(state, text) {
             const dot = document.getElementById('statusDot');
             const txt = document.getElementById('statusText');
             dot.className = 'status-dot';
             if (state === 'connecting') dot.classList.add('connecting');
             else if (state === 'error') dot.classList.add('error');
             txt.textContent = text;
-        }
+        };
 
-        function showToast(msg, type = 'info') {
+        window.showToast = function(msg, type = 'info') {
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.textContent = msg;
             document.body.appendChild(toast);
-            setTimeout(() => { toast.style.animation = 'slideInRight 0.3s ease reverse'; setTimeout(() => toast.remove(), 300); }, 3000);
-        }
+            setTimeout(() => { 
+                toast.style.animation = 'slideInRight 0.3s ease reverse'; 
+                setTimeout(() => toast.remove(), 300); 
+            }, 3000);
+        };
 
         // ========== 실시간 구독 ==========
         function subscribeToChanges() {
-            sb
-                .channel('public:players')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => {
-                    loadPlayers();
-                })
-                .subscribe();
+            sb.channel('public:players')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => {
+                  loadPlayers();
+              })
+              .subscribe();
         }
 
         // ========== 데이터 로드 ==========
         async function loadPlayers() {
             const { data, error } = await sb.from('players').select('*').order('mmr', { ascending: false });
-            if (error) { console.error(error); showToast('데이터 로드 실패: ' + error.message, 'error'); return; }
+            if (error) { 
+                console.error(error); 
+                window.showToast('데이터 로드 실패: ' + error.message, 'error'); 
+                return; 
+            }
             
             allPlayersCache = data || [];
             renderPlayerList(data || []);
@@ -409,9 +403,9 @@
                     </div>
                     <div class="player-mmr">${p.mmr}</div>
                     <div class="player-actions">
-                        <button class="btn-icon btn-lock-a ${p.lock_team === 'A' ? 'active' : ''}" onclick="toggleLockTeam('${p.id}', 'A')" title="A팀 고정">${p.lock_team === 'A' ? '🔒' : '🔓'} A</button>
-                        <button class="btn-icon btn-lock-b ${p.lock_team === 'B' ? 'active' : ''}" onclick="toggleLockTeam('${p.id}', 'B')" title="B팀 고정">${p.lock_team === 'B' ? '🔒' : '🔓'} B</button>
-                        <button class="btn-icon btn-delete" onclick="deletePlayer('${p.id}')" title="삭제">🗑️</button>
+                        <button class="btn-icon btn-lock-a ${p.lock_team === 'A' ? 'active' : ''}" onclick="window.toggleLockTeam('${p.id}', 'A')" title="A팀 고정">${p.lock_team === 'A' ? '🔒' : '🔓'} A</button>
+                        <button class="btn-icon btn-lock-b ${p.lock_team === 'B' ? 'active' : ''}" onclick="window.toggleLockTeam('${p.id}', 'B')" title="B팀 고정">${p.lock_team === 'B' ? '🔒' : '🔓'} B</button>
+                        <button class="btn-icon btn-delete" onclick="window.deletePlayer('${p.id}')" title="삭제">🗑️</button>
                     </div>
                 </li>
             `).join('');
@@ -439,9 +433,9 @@
                     </div>
                     <div class="player-mmr">${p.mmr}</div>
                     <div class="player-actions">
-                        <button class="btn-icon btn-lock-a ${p.lock_team === 'A' ? 'active' : ''}" onclick="toggleLockTeam('${p.id}', 'A')" title="A팀 고정">${p.lock_team === 'A' ? '🔒' : '🔓'} A</button>
-                        <button class="btn-icon btn-lock-b ${p.lock_team === 'B' ? 'active' : ''}" onclick="toggleLockTeam('${p.id}', 'B')" title="B팀 고정">${p.lock_team === 'B' ? '🔒' : '🔓'} B</button>
-                        <button class="btn-icon btn-delete" onclick="removeFromMatch('${p.id}')" title="참가 해제">✖</button>
+                        <button class="btn-icon btn-lock-a ${p.lock_team === 'A' ? 'active' : ''}" onclick="window.toggleLockTeam('${p.id}', 'A')" title="A팀 고정">${p.lock_team === 'A' ? '🔒' : '🔓'} A</button>
+                        <button class="btn-icon btn-lock-b ${p.lock_team === 'B' ? 'active' : ''}" onclick="window.toggleLockTeam('${p.id}', 'B')" title="B팀 고정">${p.lock_team === 'B' ? '🔒' : '🔓'} B</button>
+                        <button class="btn-icon btn-delete" onclick="window.removeFromMatch('${p.id}')" title="참가 해제">✖</button>
                     </div>
                 </li>
             `).join('');
@@ -511,13 +505,14 @@
             return tier.toLowerCase();
         }
 
-        // ========== 소환사 검색 (Riot API) ==========
-        async function searchSummoner() {
+        // ========== 온클릭 함수들을 모두 window 전역 객체에 매핑 (에러 원천 차단) ==========
+        
+        window.searchSummoner = async function() {
             const gameName = document.getElementById('gameName').value.trim();
             const tagLine = document.getElementById('tagLine').value.trim().toUpperCase();
             
             if (!gameName || !tagLine) {
-                showToast('게임명과 태그를 모두 입력해주세요.', 'warning');
+                window.showToast('게임명과 태그를 모두 입력해주세요.', 'warning');
                 return;
             }
 
@@ -536,18 +531,18 @@
                 
                 if (!resp.ok) throw new Error(data.error || '검색 실패');
                 
-                currentSummonerData = data.player; // 임시 저장
+                currentSummonerData = data.player; 
                 displaySummonerResult(data.player);
-                showToast(`${data.player.gameName}#${data.player.tagLine} 검색 완료!`, 'success');
+                window.showToast(`${data.player.gameName}#${data.player.tagLine} 검색 완료!`, 'success');
                 
             } catch (err) {
                 console.error(err);
-                showToast(err.message, 'error');
+                window.showToast(err.message, 'error');
             } finally {
                 btn.disabled = false;
                 btnText.textContent = '검색 후 등록';
             }
-        }
+        };
 
         function displaySummonerResult(player) {
             const resultEl = document.getElementById('summonerResult');
@@ -557,20 +552,16 @@
             document.getElementById('resultTag').textContent = `#${player.tagLine}`;
             document.getElementById('resultLevel').textContent = `레벨 ${player.summonerLevel}`;
             
-            // 프로필 아이콘
             const iconId = player.profileIconId || 0;
             document.getElementById('profileIcon').src = `https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${iconId}.png`;
             
-            // 티어 뱃지
             const tierBadge = document.getElementById('tierBadge');
             const tier = player.tier || 'UNRANKED';
             tierBadge.className = `tier-badge ${getTierClass(tier)}`;
             tierBadge.textContent = formatTier(tier) + (player.rank ? ` ${player.rank}` : '');
             
-            // MMR
             document.getElementById('mmrValue').textContent = player.mmr || 1200;
             
-            // 상세 정보
             const detailEl = document.getElementById('rankDetail');
             if (player.tier && player.tier !== 'UNRANKED') {
                 detailEl.innerHTML = `
@@ -584,13 +575,15 @@
             }
         }
 
-        // 티어 새로고침
-        async function fetchRankForSummoner() {
-            if (!currentSummonerData) return showToast('먼저 소환사를 검색하세요.', 'warning');
+        window.fetchRankForSummoner = async function(event) {
+            if (!currentSummonerData) return window.showToast('먼저 소환사를 검색하세요.', 'warning');
             
-            const btn = event.target;
-            btn.disabled = true;
-            btn.innerHTML = '<span class="loading"></span>조회 중...';
+            // event.target 대신 확실하게 버튼 선택
+            const btn = document.querySelector('.result-actions .btn-secondary');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span>조회 중...';
+            }
             
             try {
                 const resp = await fetch('/api/riot/rank', {
@@ -605,7 +598,6 @@
                 
                 if (!resp.ok) throw new Error(data.error || '티어 조회 실패');
                 
-                // 현재 데이터 업데이트
                 currentSummonerData.tier = data.rank.tier;
                 currentSummonerData.rank = data.rank.rank;
                 currentSummonerData.leaguePoints = data.rank.leaguePoints;
@@ -614,26 +606,25 @@
                 currentSummonerData.mmr = data.mmr;
                 
                 displaySummonerResult(currentSummonerData);
-                showToast('티어 정보가 갱신되었습니다!', 'success');
+                window.showToast('티어 정보가 갱신되었습니다!', 'success');
             } catch (err) {
-                showToast(err.message, 'error');
+                window.showToast(err.message, 'error');
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = '🔄 티어 새로고침';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔄 티어 새로고침';
+                }
             }
-        }
+        };
 
-        // 명단에 추가 (DB에 저장된 데이터 활용)
-        // 명단에 추가 (DB에 저장된 데이터 활용)
         window.addSummonerToList = async function(autoParticipate = false) {
-            if (!currentSummonerData) return showToast('검색된 소환사가 없습니다.', 'warning');
+            if (!currentSummonerData) return window.showToast('검색된 소환사가 없습니다.', 'warning');
             
             const btn = autoParticipate ? document.getElementById('addAndMatchBtn') : document.getElementById('addToListBtn');
             btn.disabled = true;
             btn.innerHTML = '<span class="loading"></span>추가 중...';
             
             try {
-                // 소환사 검색 API가 이미 upsert를 수행하므로, DB에서 최신 데이터 조회
                 const { data: player, error } = await sb
                     .from('players')
                     .select('*')
@@ -642,7 +633,6 @@
                 
                 if (error) throw error;
                 
-                // 자동 참가 옵션
                 if (autoParticipate) {
                     const currentCount = participatingPlayers.length;
                     if (currentCount >= 10) throw new Error('이미 참가자가 10명입니다.');
@@ -653,38 +643,35 @@
                         .eq('id', player.id);
                 }
                 
-                showToast(`${player.game_name}#${player.tag_line} ${autoParticipate ? '참가자로' : '명단에'} 추가됨!`, 'success');
+                window.showToast(`${player.game_name}#${player.tag_line} ${autoParticipate ? '참가자로' : '명단에'} 추가됨!`, 'success');
                 
-                // 검색 결과 초기화
                 document.getElementById('summonerResult').classList.add('hidden');
                 document.getElementById('gameName').value = '';
                 document.getElementById('tagLine').value = '';
                 currentSummonerData = null;
                 
             } catch (err) {
-                showToast(err.message, 'error');
+                window.showToast(err.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = autoParticipate ? '➕ 추가하고 매칭 참가' : '✅ 명단에 추가';
             }
-        }
+        };
 
-        // ========== 기존 기능들 (수동/일괄 추가) ==========
-        // ========== 기존 기능들 (수동/일괄 추가) ==========
         window.addPlayer = async function() {
             const name = document.getElementById('playerName').value.trim();
             const mmr = parseInt(document.getElementById('playerMmr').value);
-            if (!name || isNaN(mmr)) return showToast('이름과 점수를 확인해주세요.', 'warning');
+            if (!name || isNaN(mmr)) return window.showToast('이름과 점수를 확인해주세요.', 'warning');
             
             await sb.from('players').insert([{ name, mmr, is_participating: false, lock_team: 'none', assigned_team: null }]);
             document.getElementById('playerName').value = '';
             document.getElementById('playerMmr').value = 1200;
-            showToast(`${name} 추가됨`, 'success');
-        }
+            window.showToast(`${name} 추가됨`, 'success');
+        };
 
         window.bulkAddPlayers = async function() {
             const text = document.getElementById('bulkData').value.trim();
-            if (!text) return showToast('데이터를 입력해주세요.', 'warning');
+            if (!text) return window.showToast('데이터를 입력해주세요.', 'warning');
             
             const lines = text.split('\n');
             const insertData = [];
@@ -698,14 +685,14 @@
             }
             if (insertData.length > 0) {
                 await sb.from('players').insert(insertData);
-                showToast(`${insertData.length}명 일괄 등록 완료!`, 'success');
+                window.showToast(`${insertData.length}명 일괄 등록 완료!`, 'success');
                 document.getElementById('bulkData').value = '';
             }
-        }
+        };
 
         window.bulkAddToMatch = async function() {
             const text = document.getElementById('bulkParticipants').value.trim();
-            if (!text) return showToast('참가자 이름을 입력해주세요.', 'warning');
+            if (!text) return window.showToast('참가자 이름을 입력해주세요.', 'warning');
             
             const names = text.split(/[\s,]+/).map(n => n.trim()).filter(Boolean);
             const uniqueNames = [...new Set(names)];
@@ -716,11 +703,11 @@
             const alreadyIn = matched.filter(p => p.is_participating);
             const newParticipants = matched.filter(p => !p.is_participating);
             
-            if (matched.length === 0) return showToast(`일치하는 선수 없음: ${missing.join(', ')}`, 'error');
+            if (matched.length === 0) return window.showToast(`일치하는 선수 없음: ${missing.join(', ')}`, 'error');
             
             const available = 10 - participatingPlayers.length;
-            if (available <= 0) return showToast('이미 10명 참가 중', 'warning');
-            if (newParticipants.length > available) return showToast(`빈자리 ${available}개, 추가 필요 ${newParticipants.length}명`, 'warning');
+            if (available <= 0) return window.showToast('이미 10명 참가 중', 'warning');
+            if (newParticipants.length > available) return window.showToast(`빈자리 ${available}개, 추가 필요 ${newParticipants.length}명`, 'warning');
             
             const msg = [`${newParticipants.length}명 참가 추가`, alreadyIn.length ? `이미 참가: ${alreadyIn.map(p=>p.name).join(', ')}` : '', missing.length ? `미등록: ${missing.join(', ')}` : ''].filter(Boolean).join('\n');
             if (!confirm(msg)) return;
@@ -728,56 +715,52 @@
             const ids = newParticipants.map(p => p.id);
             await sb.from('players').update({ is_participating: true, lock_team: 'none', assigned_team: null }).in('id', ids);
             document.getElementById('bulkParticipants').value = '';
-            showToast(`${ids.length}명 참가자로 추가됨`, 'success');
-        }
+            window.showToast(`${ids.length}명 참가자로 추가됨`, 'success');
+        };
 
-        // ========== 참가자 관리 ==========
         window.toggleLockTeam = async function(id, team) {
             const player = allPlayersCache.find(p => p.id === id);
             const newValue = player.lock_team === team ? 'none' : team;
             await sb.from('players').update({ lock_team: newValue }).eq('id', id);
-        }
+        };
 
         window.removeFromMatch = async function(id) {
             await sb.from('players').update({ is_participating: false, assigned_team: null }).eq('id', id);
-        }
+        };
 
         window.deletePlayer = async function(id) {
             if (!confirm('삭제하시겠습니까?')) return;
             await sb.from('players').delete().eq('id', id);
-        }
+        };
 
-        // ========== MMR 수정 모달 ==========
         window.editPlayer = function(id, name, currentMmr) {
             document.getElementById('editPlayerId').value = id;
             document.getElementById('editMmrInput').value = currentMmr;
             document.getElementById('editModal').classList.add('active');
-        }
+        };
 
-        function closeModal() {
+        window.closeModal = function() {
             document.getElementById('editModal').classList.remove('active');
-        }
+        };
 
         window.saveMmr = async function() {
             const id = document.getElementById('editPlayerId').value;
             const mmr = parseInt(document.getElementById('editMmrInput').value);
-            if (isNaN(mmr)) return showToast('올바른 숫자를 입력하세요.', 'warning');
+            if (isNaN(mmr)) return window.showToast('올바른 숫자를 입력하세요.', 'warning');
             
             await sb.from('players').update({ mmr }).eq('id', id);
-            closeModal();
-            showToast('MMR 수정됨', 'success');
-        }
+            window.closeModal();
+            window.showToast('MMR 수정됨', 'success');
+        };
 
-        // ========== 팀 나누기 ==========
-        async function makeTeams() {
-            if (participatingPlayers.length !== 10) return showToast('정확히 10명이어야 합니다.', 'warning');
+        window.makeTeams = async function() {
+            if (participatingPlayers.length !== 10) return window.showToast('정확히 10명이어야 합니다.', 'warning');
             
             const btn = document.getElementById('makeTeamsBtn');
             btn.disabled = true;
             btn.innerHTML = '<span class="loading"></span>팀 나누는 중...';
 
             try {
-                // 기존 로직 재사용 (DFS로 최적 조합 찾기)
                 const totalPlayers = participatingPlayers.length;
                 const targetSize = Math.floor(totalPlayers / 2);
                 const totalScore = participatingPlayers.reduce((sum, p) => sum + p.mmr, 0);
@@ -834,33 +817,34 @@
                 const teamAIds = teamA.map(p => p.id);
                 const teamBIds = teamB.map(p => p.id);
 
-                // 애니메이션
                 document.getElementById('listA').innerHTML = '<li class="loading-text" style="text-align:center; padding:20px;">매칭 결과를 서버에 기록 중... ⏳</li>';
                 document.getElementById('listB').innerHTML = '<li class="loading-text" style="text-align:center; padding:20px;">매칭 결과를 서버에 기록 중... ⏳</li>';
 
                 await sb.from('players').update({ assigned_team: 'A' }).in('id', teamAIds);
                 await sb.from('players').update({ assigned_team: 'B' }).in('id', teamBIds);
                 
-                showToast(`팀 나누기 완료! (MMR 차이: ${bestDiff})`, 'success');
+                window.showToast(`팀 나누기 완료! (MMR 차이: ${bestDiff})`, 'success');
             } catch (err) {
-                showToast(err.message, 'error');
+                window.showToast(err.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '⚖️ 공평하게 5:5 팀 나누기';
             }
-        }
+        };
 
-        // ========== 시작 ==========
+        // ========== 리스너 및 시작 ==========
         document.addEventListener('DOMContentLoaded', init);
         
-        // 모달 외부 클릭 시 닫기
         document.getElementById('editModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) closeModal();
+            if (e.target === e.currentTarget) window.closeModal();
         });
         
-        // Enter 키로 검색
-        document.getElementById('gameName').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchSummoner(); });
-        document.getElementById('tagLine').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchSummoner(); });
+        document.getElementById('gameName').addEventListener('keypress', (e) => { 
+            if (e.key === 'Enter') window.searchSummoner(); 
+        });
+        document.getElementById('tagLine').addEventListener('keypress', (e) => { 
+            if (e.key === 'Enter') window.searchSummoner(); 
+        });
     </script>
 </body>
 </html>
