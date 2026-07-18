@@ -2,18 +2,19 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>🎮 게임 팀 매치 계산기</title>
+    <title>🎮 롤 내전 실시간 팀 매니저</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; color: #333; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; color: #333; }
         h1 { text-align: center; }
         
         .manager-box { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef; }
-        .input-group { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+        .input-group { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         input[type="text"], input[type="number"] { padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; width: 150px; }
         textarea { width: 100%; height: 80px; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px; }
         
         button { padding: 8px 12px; font-size: 14px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; transition: 0.2s; }
         .btn-add { background: #0070f3; padding: 10px 20px; } .btn-add:hover { background: #005bb5; }
+        .btn-riot { background: #8b5cf6; padding: 10px 20px; } .btn-riot:hover { background: #7c3aed; }
         .btn-bulk { background: #8b5cf6; padding: 10px 20px; width: 100%; } .btn-bulk:hover { background: #7c3aed; }
         .btn-participants { background: #0ea5e9; padding: 10px 20px; width: 100%; } .btn-participants:hover { background: #0284c7; }
         .btn-move { background: #10b981; font-size: 12px; } .btn-move:hover { background: #059669; }
@@ -31,12 +32,17 @@
         ul { list-style: none; padding: 0; margin: 0; }
         li { padding: 10px 0; border-bottom: 1px solid #f1f1f1; display: flex; justify-content: space-between; align-items: center; }
         .player-info { flex-grow: 1; }
+        .player-rank { font-size: 12px; color: #6b7280; margin-top: 2px; }
         .btn-group { display: flex; gap: 5px; align-items: center; } 
         
         .team-container { display: flex; justify-content: space-between; margin-top: 20px; gap: 20px; }
         .team-box { border: 1px solid #ccc; padding: 15px; width: 50%; border-radius: 8px; box-sizing: border-box; background: #fdfdfd; min-height: 200px; }
         .empty-team { text-align: center; color: #9ca3af; margin-top: 30px; font-style: italic; }
         .loading-text { text-align: center; color: #3b82f6; font-weight: bold; margin-top: 30px; animation: pulse 1.5s infinite; }
+        .riot-search-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .riot-search-box .input-group { gap: 8px; }
+        .riot-search-box input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; }
+        .riot-search-box input::placeholder { color: rgba(255,255,255,0.6); }
         
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
@@ -45,8 +51,19 @@
 
     <h1>🎮 롤 내전 실시간 팀 매니저</h1>
 
+    <!-- Riot API 검색 박스 -->
+    <div class="manager-box riot-search-box">
+        <h3 style="text-align: center; margin-top: 0; color: white;">🔍 라이엇 ID로 소환사 검색 및 자동 등록</h3>
+        <div class="input-group">
+            <input type="text" id="searchGameName" placeholder="게임명 (예: Hide on bush)" style="width: 220px;">
+            <input type="text" id="searchTagLine" placeholder="태그 (예: KR1)" style="width: 80px;" value="KR1">
+            <button class="btn-riot" onclick="searchAndAddPlayer()">검색 후 추가</button>
+        </div>
+        <p style="margin: 8px 0 0 0; font-size: 12px; opacity: 0.8;">라이엇 ID(게임명#태그)로 검색하면 랭크 티어/LP를 자동으로 가져와 MMR을 계산해 저장합니다.</p>
+    </div>
+
     <div class="manager-box">
-        <h3 style="text-align: center; margin-top: 0;">👤 선수 등록</h3>
+        <h3 style="text-align: center; margin-top: 0;">👤 수동 선수 등록</h3>
         <div class="input-group">
             <input type="text" id="playerName" placeholder="선수 이름">
             <input type="number" id="playerMmr" placeholder="점수 (예: 10)">
@@ -56,7 +73,7 @@
         <textarea id="bulkData" placeholder="여러 명 한 번에 등록하려면 여기에 복사+붙여넣기 하세요.&#13;&#10;예시:&#13;&#10;인목 10&#13;&#10;승우 10"></textarea>
         <button class="btn-bulk" onclick="bulkAddPlayers()">전체 명단 일괄 등록하기</button>
         <hr style="border: 0; border-top: 1px solid #ddd; margin: 15px 0;">
-        <textarea id="bulkParticipants" placeholder="예시:&#13;&#10;인목&#13;&#10;승우&#13;&#10;또는 인목, 승우, 도딤"></textarea>
+        <textarea id="bulkParticipants" placeholder="예시:&#13;&#10;인목&#13;&#10;승우&#13;&#10;3;&#10;또는 인목, 승우, 도딤"></textarea>
         <button class="btn-participants" onclick="bulkAddToMatch()">참가자 일괄 추가</button>
     </div>
 
@@ -92,14 +109,18 @@
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
+        // ⚠️ 여기에 본인 Supabase 정보 입력
         const supabaseUrl = 'https://xfxsubglqbwqvchpjksc.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmeHN1YmdscWJ3cXZjaHBqa3NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMzg4NTYsImV4cCI6MjA5ODkxNDg1Nn0.CTxppetZcwGWqLpUtPjnyreIY6zVgIjrvj4DP6w4maw';
         const supabase = createClient(supabaseUrl, supabaseKey);
 
+        // Vercel Functions API 엔드포인트
+        const API_BASE = '/api/riot';
+
         let participatingPlayers = [];
         let allPlayersCache = [];
 
-        // 실시간 동기화 마법
+        // 실시간 동기화 구독
         supabase
             .channel('public:players')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, payload => {
@@ -130,8 +151,12 @@
             document.getElementById('scoreB').innerText = sumB;
 
             if (teamA.length > 0) {
-                document.getElementById('listA').innerHTML = teamA.map(p => `<li>${p.name} (${p.mmr}점)</li>`).join('');
-                document.getElementById('listB').innerHTML = teamB.map(p => `<li>${p.name} (${p.mmr}점)</li>`).join('');
+                document.getElementById('listA').innerHTML = teamA.map(p => 
+                    `<li><strong>${p.game_name || p.name}</strong>#${p.tag_line || ''} (${p.mmr}점) ${p.tier ? `・${p.tier} ${p.rank || ''} ${p.league_points}LP` : ''}</li>`
+                ).join('');
+                document.getElementById('listB').innerHTML = teamB.map(p => 
+                    `<li><strong>${p.game_name || p.name}</strong>#${p.tag_line || ''} (${p.mmr}점) ${p.tier ? `・${p.tier} ${p.rank || ''} ${p.league_points}LP` : ''}</li>`
+                ).join('');
             } else {
                 document.getElementById('listA').innerHTML = '<li class="empty-team">팀을 나누면 여기에 결과가 표시됩니다.</li>';
                 document.getElementById('listB').innerHTML = '<li class="empty-team">팀을 나누면 여기에 결과가 표시됩니다.</li>';
@@ -154,14 +179,16 @@
             participatingPlayers.forEach(p => {
                 partListElement.innerHTML += `
                     <li>
-                        <span class="player-info"><strong>${p.name}</strong> (${p.mmr}점)</span>
+                        <span class="player-info"><strong>${p.game_name || p.name}</strong>#${p.tag_line || ''} (${p.mmr}점)
+                            <div class="player-rank">${p.tier ? `${p.tier} ${p.rank || ''} ${p.league_points}LP` : 'Unranked'}</div>
+                        </span>
                         <div class="btn-group">
-                            <select onchange="window.changeLock(${p.id}, this.value)" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                            <select onchange="window.changeLock('${p.id}', this.value)" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
                                 <option value="none" ${p.lock_team === 'none' || !p.lock_team ? 'selected' : ''}>🎲 랜덤</option>
                                 <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>🔵 A고정</option>
                                 <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>🔴 B고정</option>
                             </select>
-                            <button class="btn-remove" onclick="removeFromMatch(${p.id})">취소 ➡️</button>
+                            <button class="btn-remove" onclick="removeFromMatch('${p.id}')">취소 ➡️</button>
                         </div>
                     </li>
                 `;
@@ -170,11 +197,13 @@
             availablePlayers.forEach(p => {
                 dbListElement.innerHTML += `
                     <li>
-                        <span class="player-info"><strong>${p.name}</strong> (${p.mmr}점)</span>
+                        <span class="player-info"><strong>${p.game_name || p.name}</strong>#${p.tag_line || ''} (${p.mmr}점)
+                            <div class="player-rank">${p.tier ? `${p.tier} ${p.rank || ''} ${p.league_points}LP` : 'Unranked'}</div>
+                        </span>
                         <div class="btn-group">
-                            <button class="btn-move" onclick="addToMatch(${p.id})">⬅️ 참가</button>
-                            <button class="btn-edit" onclick="editPlayer(${p.id}, '${p.name}', ${p.mmr})">수정</button>
-                            <button class="btn-delete" onclick="deletePlayer(${p.id})">삭제</button>
+                            <button class="btn-move" onclick="addToMatch('${p.id}')">⬅️ 참가</button>
+                            <button class="btn-edit" onclick="editPlayer('${p.id}', '${(p.game_name || p.name).replace(/'/g, "\\'")}', ${p.mmr})">수정</button>
+                            <button class="btn-delete" onclick="deletePlayer('${p.id}')">삭제</button>
                         </div>
                     </li>
                 `;
@@ -214,7 +243,15 @@
             const name = document.getElementById('playerName').value.trim();
             const mmr = parseInt(document.getElementById('playerMmr').value);
             if (!name || isNaN(mmr)) return alert("이름과 점수를 확인해주세요.");
-            await supabase.from('players').insert([{ name, mmr, is_participating: false, lock_team: 'none', assigned_team: null }]);
+            await supabase.from('players').insert([{ 
+                name, 
+                mmr, 
+                game_name: name, 
+                tag_line: 'MANUAL',
+                is_participating: false, 
+                lock_team: 'none', 
+                assigned_team: null 
+            }]);
             document.getElementById('playerName').value = '';
             document.getElementById('playerMmr').value = '';
         }
@@ -229,7 +266,7 @@
                 if (parts.length >= 2) {
                     const name = parts[0];
                     const mmr = parseInt(parts[1]);
-                    if (!isNaN(mmr)) insertData.push({ name, mmr, is_participating: false, lock_team: 'none', assigned_team: null });
+                    if (!isNaN(mmr)) insertData.push({ name, mmr, game_name: name, tag_line: 'MANUAL', is_participating: false, lock_team: 'none', assigned_team: null });
                 }
             }
             if (insertData.length > 0) {
@@ -251,7 +288,7 @@
             const uniqueNames = [...new Set(names)];
             if (uniqueNames.length === 0) return alert("참가자 이름을 입력해주세요.");
 
-            const playersByName = new Map(allPlayersCache.map(player => [player.name.trim(), player]));
+            const playersByName = new Map(allPlayersCache.map(player => [player.game_name?.trim() || player.name.trim(), player]));
             const matchedPlayers = uniqueNames
                 .map(name => playersByName.get(name))
                 .filter(Boolean);
@@ -271,7 +308,7 @@
 
             const message = [
                 `${newParticipants.length}명을 참가자로 추가합니다.`,
-                alreadyParticipating.length ? `이미 참가 중: ${alreadyParticipating.map(player => player.name).join(', ')}` : '',
+                alreadyParticipating.length ? `이미 참가 중: ${alreadyParticipating.map(player => player.game_name || player.name).join(', ')}` : '',
                 missingNames.length ? `등록 안 됨: ${missingNames.join(', ')}` : ''
             ].filter(Boolean).join('\n');
 
@@ -290,6 +327,54 @@
         window.deletePlayer = async function(id) {
             if (!confirm("삭제하시겠습니까?")) return;
             await supabase.from('players').delete().eq('id', id);
+        }
+
+        // 🔍 라이엇 ID로 소환사 검색 및 자동 등록
+        window.searchAndAddPlayer = async function() {
+            const gameName = document.getElementById('searchGameName').value.trim();
+            const tagLine = document.getElementById('searchTagLine').value.trim() || 'KR1';
+            
+            if (!gameName) return alert('게임명을 입력하세요');
+
+            const btn = document.querySelector('.btn-riot');
+            const originalText = btn.textContent;
+            btn.textContent = '검색 중...';
+            btn.disabled = true;
+
+            try {
+                // 1. 소환사 검색 (ACCOUNT-V1 + SUMMONER-V4)
+                const resp = await fetch(`${API_BASE}/summoner`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ gameName, tagLine })
+                });
+                const result = await resp.json();
+                if (!resp.ok) throw new Error(result.error || '소환사 검색 실패');
+
+                const { player, summoner } = result;
+                
+                // 2. 랭크 조회 (LEAGUE-V4) → MMR 자동 계산 + DB 저장
+                const rankResp = await fetch(`${API_BASE}/rank`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ encryptedSummonerId: player.encryptedSummonerId })
+                });
+                const rankData = await rankResp.json();
+
+                if (rankResp.ok && rankData.mmr) {
+                    alert(`${gameName}#${tagLine} 추가 완료!\n티어: ${rankData.rank?.tier || 'Unranked'} ${rankData.rank?.rank || ''} ${rankData.rank?.leaguePoints || 0}LP\nMMR: ${rankData.mmr}점`);
+                } else {
+                    alert(`${gameName}#${tagLine} 추가 완료! (랭크 정보 없음 - Unranked로 저장됨)`);
+                }
+                
+                document.getElementById('searchGameName').value = '';
+                loadPlayers(); // 실시간 구독이 있지만 즉시 반영 위해 호출
+            } catch (e) {
+                alert('오류: ' + e.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
         }
 
         // 🌟 팀을 나누고 DB에 결과를 쏘아 올리는 로직
