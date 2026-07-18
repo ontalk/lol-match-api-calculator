@@ -313,25 +313,21 @@
 
         // ========== 초기화 ==========
         async function init() {
-            updateStatus('connecting', '설정 로드 중...');
+            window.updateStatus('connecting', 'DB 다이렉트 연결 중...');
             try {
-                const resp = await fetch('/api/config');
-                if (!resp.ok) throw new Error('설정 로드 실패');
-                const config = await resp.json();
-                
-                if (!config.supabaseUrl || !config.supabaseAnonKey) {
-                    throw new Error('Supabase 설정이 없습니다.');
-                }
+                // Vercel 환경 변수를 거치지 않고 브라우저에 다이렉트로 새 키를 꽂습니다!
+                const directUrl = 'https://rsskmmpnaqbzdmtghwcu.supabase.co';
+                const directKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzc2ttbXBuYXFiemRtdGdod2N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzNjQ1NjgsImV4cCI6MjA5OTk0MDU2OH0.6UPoKjqTtE9A6y0mLcduwmvG10ppsuETSfn1HG1hUhM';
 
-                // 충돌 방지를 위해 window.supabase로 명시적 호출
-                sb = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+                // 새 주소와 새 키로 Supabase 연결
+                sb = window.supabase.createClient(directUrl, directKey);
                 
                 subscribeToChanges();
                 await loadPlayers();
-                updateStatus('connected', '연결됨 - 실시간 동기화 활성화');
+                window.updateStatus('connected', '연결됨 - 실시간 동기화 활성화');
             } catch (err) {
                 console.error('초기화 실패:', err);
-                updateStatus('error', '연결 실패: ' + err.message);
+                window.updateStatus('error', '연결 실패: ' + err.message);
                 window.showToast('초기화 실패: ' + err.message, 'error');
             }
         }
