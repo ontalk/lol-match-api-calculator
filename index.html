@@ -720,12 +720,11 @@
                 
                 if (!resp.ok) throw new Error(result.error || '소환사 검색 실패');
                 
+                // 소환사 기본 정보 저장
                 currentSummonerData = result;
-                showSummonerResult(result);
-                window.showToast('소환사 검색 완료!', 'success');
                 
-                // 자동으로 티어/랭크 정보 가져오기
-                if (result.summoner?.id) {
+                // 자동으로 티어/랭크 정보 가져오기 (MMR 계산을 위해 대기)
+                if (result.summoner?.id && result.player?.puuid) {
                     try {
                         const rankResp = await fetch('/api/riot/rank', {
                             method: 'POST',
@@ -737,7 +736,7 @@
                         });
                         const rankResult = await rankResp.json();
                         if (rankResp.ok && rankResult.rank) {
-                            // 티어/랭크/LP 데이터 병합 (기존 player 데이터 보존)
+                            // rank 데이터를 player 객체에 병합 (백엔드 계산 MMR 사용)
                             currentSummonerData.player = {
                                 ...currentSummonerData.player,
                                 tier: rankResult.rank.tier,
@@ -746,15 +745,18 @@
                                 wins: rankResult.rank.wins,
                                 losses: rankResult.rank.losses,
                                 queueType: rankResult.rank.queueType,
-                                mmr: calculateMMRFromTier(rankResult.rank.tier, rankResult.rank.rank, rankResult.rank.leaguePoints)
+                                mmr: rankResult.mmr
                             };
-                            showSummonerResult(currentSummonerData);
-                            window.showToast('티어 정보 자동 갱신 완료', 'success');
                         }
                     } catch (rankErr) {
                         console.warn('티어 자동 갱신 실패:', rankErr.message);
                     }
                 }
+                
+                // 결과 표시 (티어 정보가 있으면 티어 기반 MMR, 없으면 기본값)
+                showSummonerResult(currentSummonerData);
+                window.showToast('소환사 검색 완료!', 'success');
+                
             } catch (err) {
                 console.error('소환사 검색 에러:', err);
                 window.showToast(err.message, 'error');
