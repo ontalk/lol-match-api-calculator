@@ -729,6 +729,29 @@
                 currentSummonerData = result;
                 showSummonerResult(result);
                 window.showToast('소환사 검색 완료!', 'success');
+                
+                // 자동으로 티어/랭크 정보 가져오기
+                if (result.summoner?.id) {
+                    try {
+                        const rankResp = await fetch('/api/riot/rank', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                encryptedSummonerId: result.summoner.id,
+                                puuid: result.player.puuid
+                            })
+                        });
+                        const rankResult = await rankResp.json();
+                        if (rankResp.ok && rankResult.player) {
+                            // 최신 데이터로 갱신
+                            currentSummonerData = { ...currentSummonerData, player: rankResult.player };
+                            showSummonerResult(currentSummonerData);
+                            window.showToast('티어 정보 자동 갱신 완료', 'success');
+                        }
+                    } catch (rankErr) {
+                        console.warn('티어 자동 갱신 실패:', rankErr.message);
+                    }
+                }
             } catch (err) {
                 console.error('소환사 검색 에러:', err);
                 window.showToast(err.message, 'error');
