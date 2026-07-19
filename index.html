@@ -734,19 +734,32 @@
                                 puuid: result.player.puuid
                             })
                         });
-                        const rankResult = await rankResp.json();
-                        if (rankResp.ok && rankResult.rank) {
-                            // rank 데이터를 player 객체에 병합 (백엔드 계산 MMR 사용)
-                            currentSummonerData.player = {
-                                ...currentSummonerData.player,
-                                tier: rankResult.rank.tier,
-                                rank: rankResult.rank.rank,
-                                leaguePoints: rankResult.rank.leaguePoints,
-                                wins: rankResult.rank.wins,
-                                losses: rankResult.rank.losses,
-                                queueType: rankResult.rank.queueType,
-                                mmr: rankResult.mmr
-                            };
+                        const rankData = await rankResp.json();
+                        
+                        if (rankResp.ok) {
+                            // 🔥 배열(List)로 오든 객체로 오든 솔로랭크만 찾아내는 만능 코드
+                            const rawRank = rankData.rank || rankData;
+                            let soloRank = null;
+
+                            if (Array.isArray(rawRank)) {
+                                soloRank = rawRank.find(r => r.queueType === 'RANKED_SOLO_5x5');
+                                if (!soloRank && rawRank.length > 0) soloRank = rawRank[0]; // 솔랭 없으면 자랭이라도
+                            } else {
+                                soloRank = rawRank;
+                            }
+
+                            if (soloRank && soloRank.tier) {
+                                currentSummonerData.player = {
+                                    ...currentSummonerData.player,
+                                    tier: soloRank.tier,
+                                    rank: soloRank.rank,
+                                    leaguePoints: soloRank.leaguePoints,
+                                    wins: soloRank.wins,
+                                    losses: soloRank.losses,
+                                    queueType: soloRank.queueType,
+                                    mmr: rankData.mmr || calculateMMRFromTier(soloRank.tier, soloRank.rank, soloRank.leaguePoints)
+                                };
+                            }
                         }
                     } catch (rankErr) {
                         console.warn('티어 자동 갱신 실패:', rankErr.message);
@@ -817,21 +830,31 @@
                         puuid: currentSummonerData.player.puuid
                     })
                 });
-                const rankResult = await resp.json();
+                const rankData = await resp.json();
                 
-                if (!resp.ok) throw new Error(rankResult.error || '티어 갱신 실패');
+                if (!resp.ok) throw new Error(rankData.error || '티어 갱신 실패');
                 
-                if (rankResult.rank) {
-                    // 티어/랭크/LP 데이터 병합 (기존 player 데이터 보존)
+                // 🔥 여기서도 똑같이 스마트 파싱 적용
+                const rawRank = rankData.rank || rankData;
+                let soloRank = null;
+
+                if (Array.isArray(rawRank)) {
+                    soloRank = rawRank.find(r => r.queueType === 'RANKED_SOLO_5x5');
+                    if (!soloRank && rawRank.length > 0) soloRank = rawRank[0];
+                } else {
+                    soloRank = rawRank;
+                }
+
+                if (soloRank && soloRank.tier) {
                     currentSummonerData.player = {
                         ...currentSummonerData.player,
-                        tier: rankResult.rank.tier,
-                        rank: rankResult.rank.rank,
-                        leaguePoints: rankResult.rank.leaguePoints,
-                        wins: rankResult.rank.wins,
-                        losses: rankResult.rank.losses,
-                        queueType: rankResult.rank.queueType,
-                        mmr: calculateMMRFromTier(rankResult.rank.tier, rankResult.rank.rank, rankResult.rank.leaguePoints)
+                        tier: soloRank.tier,
+                        rank: soloRank.rank,
+                        leaguePoints: soloRank.leaguePoints,
+                        wins: soloRank.wins,
+                        losses: soloRank.losses,
+                        queueType: soloRank.queueType,
+                        mmr: calculateMMRFromTier(soloRank.tier, soloRank.rank, soloRank.leaguePoints)
                     };
                     showSummonerResult(currentSummonerData);
                     window.showToast('티어 정보 갱신 완료', 'success');
