@@ -93,15 +93,22 @@
         .player-rank { font-size: 12px; padding: 2px 8px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
         .player-mmr { font-weight: 700; color: #f0c808; font-size: 16px; margin: 0 15px; min-width: 60px; text-align: right; }
         
-        /* 수평 잠금 버튼 컨테이너 */
-        .player-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-        .lock-buttons { display: flex; gap: 4px; }
+        /* 드롭다운 잠금 컨테이너 - temp_old.html 스타일 */
+        .player-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .lock-select { 
+            padding: 6px 10px; 
+            border: 1px solid #0f3460; 
+            background: #0f0f23; 
+            color: #eee; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            cursor: pointer;
+            min-width: 110px;
+        }
+        .lock-select:focus { outline: none; border-color: #e94560; box-shadow: 0 0 0 2px rgba(233,69,96,0.2); }
+        .lock-select option { background: #16213e; color: #eee; }
         .btn-icon { width: 32px; height: 32px; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.2s; }
         .btn-icon:hover { transform: scale(1.1); }
-        .btn-lock-a { background: rgba(233,69,96,0.2); color: #e94560; }
-        .btn-lock-a.active, .btn-lock-a:hover { background: #e94560; color: white; }
-        .btn-lock-b { background: rgba(52,152,219,0.2); color: #3498db; }
-        .btn-lock-b.active, .btn-lock-b:hover { background: #3498db; color: white; }
         .btn-add-participant { background: rgba(46,204,113,0.2); color: #2ecc71; }
         .btn-add-participant:hover { background: #2ecc71; color: white; }
         .btn-delete { background: rgba(231,76,60,0.2); color: #e74c3c; }
@@ -278,7 +285,7 @@
 
                 <!-- 전체 명단 - 스크롤 컨테이너 추가 -->
                 <div style="margin-top: 15px;">
-                    <h4 style="color: #aaa; margin: 0 0 10px;">전체 명단 (클릭하여 참가/해제, 자물쇠로 팀 고정)</h4>
+                    <h4 style="color: #aaa; margin: 0 0 10px;">전체 명단 (드롭다운으로 팀 고정, ➕로 참가자 추가)</h4>
                     <div class="player-list-container" id="playerListContainer">
                         <ul class="player-list" id="playerList"></ul>
                     </div>
@@ -355,6 +362,64 @@
         let allPlayersCache = [];
         let participatingPlayers = [];
         let currentSummonerData = null; 
+
+        // ========== 티어/랭크 기반 MMR 계산 함수 ==========
+        /**
+         * Riot API 티어/랭크/리그포인트를 기반으로 MMR 점수 계산
+         * Iron ~ Diamond: 티어 기본값 + 디비전 보너스 (IV=0, III=2.5, II=5, I=7.5) + LP/50 * 2.5
+         * Master: 60 + LP/50 * 2.5
+         * Grandmaster: 60 + 17.5 (300LP 기준) + (LP-300)/50 * 2.5
+         * Challenger: Grandmaster와 동일 계산
+         */
+        function calculateMMRFromTier(tier, rank, leaguePoints) {
+            const tierUpper = (tier || 'UNRANKED').toUpperCase();
+            const rankUpper = (rank || 'IV').toUpperCase();
+            const lp = parseInt(leaguePoints) || 0;
+            
+            // 티어별 기본 점수 (IV 기준)
+            const tierBaseScores = {
+                'IRON': 0,
+                'BRONZE': 10,
+                'SILVER': 20,
+                'GOLD': 30,
+                'PLATINUM': 40,
+                'EMERALD': 50,
+                'DIAMOND': 60,
+                'MASTER': 60,
+                'GRANDMASTER': 60 + 17.5, // Master 300LP = +17.5
+                'CHALLENGER': 60 + 17.5,
+                'UNRANKED': 0
+            };
+            
+            // 디비전 보너스 (IV=0, III=2.5, II=5, I=7.5)
+            const divisionBonus = {
+                'IV': 0,
+                'III': 2.5,
+                'II': 5,
+                'I': 7.5,
+                '': 0
+            };
+            
+            const baseScore = tierBaseScores[tierUpper] || 0;
+            const divBonus = divisionBonus[rankUpper] || 0;
+            
+            // Master 이상은 LP 기반 추가 점수
+            if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tierUpper)) {
+                // Master: 60점부터 시작, 50LP마다 2.5점
+                // Grandmaster: 300LP부터 시작 (이미 17.5점 포함), 추가 LP마다 2.5점/50LP
+                // Challenger: 동일
+                let additionalLP = lp;
+                if (tierUpper === 'GRANDMASTER' || tierUpper === 'CHALLENGER') {
+                    additionalLP = Math.max(0, lp - 300); // 300LP 초과분만
+                }
+                const lpBonus = (additionalLP / 50) * 2.5;
+                return Math.round((baseScore + divBonus + lpBonus) * 10) / 10; // 소수점 1자리
+            }
+            
+            // Iron ~ Diamond: LP 보너스 (50LP = 2.5점)
+            const lpBonus = (lp / 50) * 2.5;
+            return Math.round((baseScore + divBonus + lpBonus) * 10) / 10;
+        }
 
         // ========== 초기화 ==========
         async function init() {
@@ -448,16 +513,11 @@
                     </div>
                     <div class="player-mmr">${p.mmr}</div>
                     <div class="player-actions">
-                        <div class="lock-buttons">
-                            <button class="btn-icon btn-lock-a ${p.lock_team === 'A' ? 'active' : ''}" 
-                                    onclick="window.toggleLockTeam('${p.id}', 'A')" title="A팀 고정">
-                                ${p.lock_team === 'A' ? '🔒' : '🔓'} A
-                            </button>
-                            <button class="btn-icon btn-lock-b ${p.lock_team === 'B' ? 'active' : ''}" 
-                                    onclick="window.toggleLockTeam('${p.id}', 'B')" title="B팀 고정">
-                                ${p.lock_team === 'B' ? '🔒' : '🔓'} B
-                            </button>
-                        </div>
+                        <select class="lock-select" onchange="window.toggleLockTeam('${p.id}', this.value)" title="팀 고정 설정">
+                            <option value="none" ${p.lock_team === 'none' || !p.lock_team ? 'selected' : ''}>자유 배정</option>
+                            <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>A팀 고정</option>
+                            <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀 고정</option>
+                        </select>
                         <button class="btn-icon btn-add-participant" 
                                 onclick="window.addToParticipants('${p.id}')" 
                                 title="매칭 참가자 추가"
@@ -492,16 +552,11 @@
                     </div>
                     <div class="player-mmr">${p.mmr}</div>
                     <div class="player-actions">
-                        <div class="lock-buttons">
-                            <button class="btn-icon btn-lock-a ${p.lock_team === 'A' ? 'active' : ''}" 
-                                    onclick="window.toggleLockTeam('${p.id}', 'A')" title="A팀 고정">
-                                ${p.lock_team === 'A' ? '🔒' : '🔓'} A
-                            </button>
-                            <button class="btn-icon btn-lock-b ${p.lock_team === 'B' ? 'active' : ''}" 
-                                    onclick="window.toggleLockTeam('${p.id}', 'B')" title="B팀 고정">
-                                ${p.lock_team === 'B' ? '🔒' : '🔓'} B
-                            </button>
-                        </div>
+                        <select class="lock-select" onchange="window.toggleLockTeam('${p.id}', this.value)" title="팀 고정 설정">
+                            <option value="none" ${p.lock_team === 'none' || !p.lock_team ? 'selected' : ''}>자유 배정</option>
+                            <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>A팀 고정</option>
+                            <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀 고정</option>
+                        </select>
                         <button class="btn-icon btn-delete" onclick="window.removeFromMatch('${p.id}')" title="참가 해제">✖</button>
                     </div>
                 </li>
@@ -603,19 +658,26 @@
         };
 
         window.toggleLockTeam = async function(id, team) {
-            const player = allPlayersCache.find(p => p.id === id);
-            const newValue = player.lock_team === team ? 'none' : team;
-            await sb.from('players').update({ lock_team: newValue }).eq('id', id);
+            await sb.from('players').update({ lock_team: team }).eq('id', id);
         };
 
-        // ✅ 새로운 함수: 전체 명단에서 매칭 참가자로 추가
+        // ✅ 전체 명단에서 매칭 참가자로 추가 (이동: is_participating=true, lock_team/assigned_team 초기화)
         window.addToParticipants = async function(id) {
-            await sb.from('players').update({ is_participating: true, lock_team: 'none', assigned_team: null }).eq('id', id);
+            await sb.from('players').update({ 
+                is_participating: true, 
+                lock_team: 'none', 
+                assigned_team: null 
+            }).eq('id', id);
             window.showToast('참가자로 추가됨', 'success');
         };
 
+        // ✅ 매칭 참가자에서 빼기 (이동: is_participating=false, lock_team/assigned_team 초기화)
         window.removeFromMatch = async function(id) {
-            await sb.from('players').update({ is_participating: false, assigned_team: null }).eq('id', id);
+            await sb.from('players').update({ 
+                is_participating: false, 
+                lock_team: 'none', 
+                assigned_team: null 
+            }).eq('id', id);
         };
 
         window.deletePlayer = async function(id) {
@@ -745,6 +807,9 @@
             
             const { player, summoner } = currentSummonerData;
             
+            // MMR 계산: 티어/랭크/LP 기반
+            const calculatedMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
+            
             // Upsert: puuid 기준으로 중복 방지
             const { data: upserted, error } = await sb
                 .from('players')
@@ -761,7 +826,7 @@
                     league_points: player.leaguePoints,
                     wins: player.wins,
                     losses: player.losses,
-                    mmr: player.mmr,
+                    mmr: calculatedMMR,  // 계산된 MMR 사용
                     last_rank_update: new Date().toISOString(),
                 }, {
                     onConflict: 'puuid',
@@ -775,7 +840,7 @@
                 return window.showToast('명단 추가 실패: ' + error.message, 'error');
             }
             
-            window.showToast('명단에 추가됨', 'success');
+            window.showToast(`명단에 추가됨 (MMR: ${calculatedMMR})`, 'success');
             currentSummonerData = null;
             document.getElementById('summonerResult').classList.add('hidden');
             document.getElementById('gameName').value = '';
