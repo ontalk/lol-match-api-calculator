@@ -505,7 +505,6 @@
             btn.disabled = participatingPlayers.length !== 10;
         }
 
-        // ========== 유틸 ==========
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
@@ -519,7 +518,6 @@
             return map[t] || t;
         }
 
-        // ========== 액션 함수들 ==========
         window.addPlayer = async function() {
             const name = document.getElementById('playerName').value.trim();
             const mmr = parseInt(document.getElementById('playerMmr').value) || 1200;
@@ -625,14 +623,15 @@
                 
                 currentSummonerData = data.player || data;
                 
-                const targetId = currentSummonerData.encryptedSummonerId || currentSummonerData.id || (currentSummonerData.summoner && currentSummonerData.summoner.id);
+                // 🔥 무조건 PUUID만 사용하도록 수정!
+                const targetPuuid = currentSummonerData.puuid;
                 
-                if (targetId) {
+                if (targetPuuid) {
                     try {
                         const rankResp = await fetch('/api/riot/rank', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ encryptedSummonerId: targetId })
+                            body: JSON.stringify({ puuid: targetPuuid })
                         });
                         const rankData = await rankResp.json();
                         
@@ -708,13 +707,14 @@
             const btn = document.querySelector('.result-actions .btn-secondary') || (event && event.currentTarget);
             if(btn) { btn.disabled = true; btn.innerHTML = '<span class="loading"></span>갱신 중...'; }
             
-            const targetId = currentSummonerData.encryptedSummonerId || currentSummonerData.id || (currentSummonerData.summoner && currentSummonerData.summoner.id);
+            // 🔥 여기도 무조건 PUUID만 사용!
+            const targetPuuid = currentSummonerData.puuid;
 
             try {
                 const rankResp = await fetch('/api/riot/rank', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ encryptedSummonerId: targetId })
+                    body: JSON.stringify({ puuid: targetPuuid })
                 });
                 const rankData = await rankResp.json();
                 
