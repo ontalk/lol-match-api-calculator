@@ -296,53 +296,31 @@
         let currentSummonerData = null; 
 
         // ========== 티어/랭크 기반 MMR 계산 함수 ==========
-        /**
-         * MMR 계산 공식 (사용자 요구사항 반영):
-         * - 아이언 ~ 다이아: 티어 기본점수 + 디비전 보너스 (4=0, 3=2.5, 2=5, 1=7.5)
-         *   아이언 0점대, 브론즈 10점대, 실버 20점대, 골드 30점대, 플레 40점대, 에메랄드 50점대, 다이아 60점대
-         * - 마스터~챌린저: 마스터 기준 60점(=70점 베이스로 통일) + LP/50 * 2.5
-         *   그마 300LP 이상이므로 60 + 300/50*2.5 = 60 + 15 = 75점 시작
-         */
         function calculateMMRFromTier(tier, rank, leaguePoints) {
             const tierUpper = (tier || 'UNRANKED').toUpperCase();
             const rankUpper = (rank || 'IV').toUpperCase();
             const lp = parseInt(leaguePoints) || 0;
             
-            // 티어별 기본 점수 (사용자 요청: 아이언 0, 브론즈 10, 실버 20, 골드 30, 플레 40, 에메랄드 50, 다이아 60, 마스터+ 70)
             const tierBaseScores = {
-                'IRON': 0,
-                'BRONZE': 10,
-                'SILVER': 20,
-                'GOLD': 30,
-                'PLATINUM': 40,
-                'EMERALD': 50,
-                'DIAMOND': 60,
-                'MASTER': 70,
-                'GRANDMASTER': 70,
-                'CHALLENGER': 70,
+                'IRON': 0, 'BRONZE': 10, 'SILVER': 20, 'GOLD': 30,
+                'PLATINUM': 40, 'EMERALD': 50, 'DIAMOND': 60,
+                'MASTER': 70, 'GRANDMASTER': 70, 'CHALLENGER': 70,
                 'UNRANKED': 1200
             };
             
-            // 디비전 보너스 (4=0, 3=2.5, 2=5, 1=7.5)
             const divisionBonus = { 'IV': 0, 'III': 2.5, 'II': 5, 'I': 7.5, '': 0 };
+            const baseScore = tierBaseScores[tierUpper] || 1200;
             
-            const baseScore = tierBaseScores[tierUpper] || 0;
-            
-            // 언랭크는 기본 1200점
-            if (tierUpper === 'UNRANKED' || baseScore === 1200) return 1200;
-            
+            if (baseScore === 1200) return 1200;
+
             let finalMmr = 0;
-            
-            // 마스터, 그마, 챌린저: 베이스 70 + LP/50 * 2.5
             if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tierUpper)) {
-                finalMmr = baseScore + (lp / 50) * 2.5;
+                finalMmr = baseScore + ((lp / 50) * 2.5);
             } else {
-                // 아이언 ~ 다이아: 베이스 + 디비전 보너스
                 finalMmr = baseScore + (divisionBonus[rankUpper] || 0);
             }
             
-            // 소수점 1자리까지 반올림 (예: 10.5, 12.5 등)
-            return Math.round(finalMmr * 10) / 10;
+            return Math.round(finalMmr);
         }
 
         // ========== 초기화 ==========

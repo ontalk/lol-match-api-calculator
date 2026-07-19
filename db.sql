@@ -66,58 +66,42 @@ CREATE POLICY "Public delete players" ON players FOR DELETE USING (true);
 ALTER PUBLICATION supabase_realtime ADD TABLE players;
 
 -- 5. Helper function: Calculate MMR from tier/rank/LP
---    Matches frontend calculateMMRFromTier logic:
---    Iron=0, Bronze=10, Silver=20, Gold=30, Platinum=40, Emerald=50, Diamond=60, Master+=70
---    Division bonus: IV=0, III=2.5, II=5, I=7.5
---    Master+: base 70 + LP/50 * 2.5
+--    Same logic as api/riot/rank.js calculateMMR()
 CREATE OR REPLACE FUNCTION calculate_mmr(tier TEXT, rank TEXT, league_points INTEGER)
-RETURNS NUMERIC LANGUAGE plpgsql IMMUTABLE AS $$
+RETURNS INTEGER LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE
-    base_score NUMERIC;
-    div_bonus NUMERIC;
-    lp_bonus NUMERIC;
-    final_mmr NUMERIC;
+    base_mmr INTEGER;
+    rank_bonus INTEGER;
+    lp_bonus INTEGER;
 BEGIN
-    -- Tier base scores (Iron=0, Bronze=10, Silver=20, Gold=30, Platinum=40, Emerald=50, Diamond=60, Master+=70)
+    -- Base MMR by tier
     CASE UPPER(COALESCE(tier, ''))
-        WHEN 'IRON' THEN base_score := 0;
-        WHEN 'BRONZE' THEN base_score := 10;
-        WHEN 'SILVER' THEN base_score := 20;
-        WHEN 'GOLD' THEN base_score := 30;
-        WHEN 'PLATINUM' THEN base_score := 40;
-        WHEN 'EMERALD' THEN base_score := 50;
-        WHEN 'DIAMOND' THEN base_score := 60;
-        WHEN 'MASTER' THEN base_score := 70;
-        WHEN 'GRANDMASTER' THEN base_score := 70;
-        WHEN 'CHALLENGER' THEN base_score := 70;
-        ELSE base_score := 1200; -- UNRANKED default
+        WHEN 'IRON' THEN base_mmr := 800;
+        WHEN 'BRONZE' THEN base_mmr := 900;
+        WHEN 'SILVER' THEN base_mmr := 1000;
+        WHEN 'GOLD' THEN base_mmr := 1100;
+        WHEN 'PLATINUM' THEN base_mmr := 1200;
+        WHEN 'EMERALD' THEN base_mmr := 1300;
+        WHEN 'DIAMOND' THEN base_mmr := 1400;
+        WHEN 'MASTER' THEN base_mmr := 1600;
+        WHEN 'GRANDMASTER' THEN base_mmr := 1800;
+        WHEN 'CHALLENGER' THEN base_mmr := 2000;
+        ELSE base_mmr := 1200; -- Unranked default
     END CASE;
 
-    -- Unranked returns 1200
-    IF base_score = 1200 THEN
-        RETURN 1200;
-    END IF;
-
-    -- Division bonus for Iron ~ Diamond (IV=0, III=2.5, II=5, I=7.5)
-    CASE COALESCE(UPPER(rank), '')
-        WHEN 'IV' THEN div_bonus := 0;
-        WHEN 'III' THEN div_bonus := 2.5;
-        WHEN 'II' THEN div_bonus := 5;
-        WHEN 'I' THEN div_bonus := 7.5;
-        ELSE div_bonus := 0; -- Master+ has no division
+    -- Rank bonus (IV=0, III=25, II=50, I=75)
+    CASE COALESCE(rank, '')
+        WHEN 'IV' THEN rank_bonus := 0;
+        WHEN 'III' THEN rank_bonus := 25;
+        WHEN 'II' THEN rank_bonus := 50;
+        WHEN 'I' THEN rank_bonus := 75;
+        ELSE rank_bonus := 0; -- Master+ has no rank
     END CASE;
 
-    -- Master, Grandmaster, Challenger: base 70 + LP/50 * 2.5
-    IF UPPER(COALESCE(tier, '')) IN ('MASTER', 'GRANDMASTER', 'CHALLENGER') THEN
-        lp_bonus := (COALESCE(league_points, 0)::NUMERIC / 50) * 2.5;
-        final_mmr := base_score + lp_bonus;
-    ELSE
-        -- Iron ~ Diamond: base + division bonus
-        final_mmr := base_score + div_bonus;
-    END IF;
+    -- LP bonus (0-100 LP -> 0-50 MMR)
+    lp_bonus := LEAST(COALESCE(league_points, 0) / 2, 50);
 
-    -- Round to 1 decimal place
-    RETURN ROUND(final_mmr * 10) / 10;
+    RETURN base_mmr + rank_bonus + lp_bonus;
 END;
 $$;
 
