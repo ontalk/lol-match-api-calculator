@@ -495,11 +495,13 @@
         // ========== 렌더링 함수들 ==========
         function renderPlayerList(players) {
             const list = document.getElementById('playerList');
-            if (players.length === 0) {
+            // 전체 명단에서는 참가중인 사람 제외 (이동 방식이므로)
+            const availablePlayers = players.filter(p => !p.is_participating);
+            if (availablePlayers.length === 0) {
                 list.innerHTML = '<li class="muted" style="text-align:center; padding:20px;">등록된 플레이어가 없습니다.</li>';
                 return;
             }
-            list.innerHTML = players.map(p => `
+            list.innerHTML = availablePlayers.map(p => `
                 <li class="player-item ${p.lock_team === 'A' ? 'locked-a' : ''} ${p.lock_team === 'B' ? 'locked-b' : ''}" data-id="${p.id}">
                     <div class="player-main">
                         <div class="player-avatar">
@@ -520,9 +522,8 @@
                         </select>
                         <button class="btn-icon btn-add-participant" 
                                 onclick="window.addToParticipants('${p.id}')" 
-                                title="매칭 참가자 추가"
-                                ${p.is_participating ? 'disabled' : ''}>
-                            ${p.is_participating ? '✓' : '➕'}
+                                title="매칭 참가자 추가">
+                            ➕
                         </button>
                         <button class="btn-icon btn-delete" onclick="window.deletePlayer('${p.id}')" title="삭제">🗑️</button>
                     </div>
