@@ -736,9 +736,18 @@
                             })
                         });
                         const rankResult = await rankResp.json();
-                        if (rankResp.ok && rankResult.player) {
-                            // 최신 데이터로 갱신
-                            currentSummonerData = { ...currentSummonerData, player: rankResult.player };
+                        if (rankResp.ok && rankResult.rank) {
+                            // 티어/랭크/LP 데이터 병합 (기존 player 데이터 보존)
+                            currentSummonerData.player = {
+                                ...currentSummonerData.player,
+                                tier: rankResult.rank.tier,
+                                rank: rankResult.rank.rank,
+                                leaguePoints: rankResult.rank.leaguePoints,
+                                wins: rankResult.rank.wins,
+                                losses: rankResult.rank.losses,
+                                queueType: rankResult.rank.queueType,
+                                mmr: calculateMMRFromTier(rankResult.rank.tier, rankResult.rank.rank, rankResult.rank.leaguePoints)
+                            };
                             showSummonerResult(currentSummonerData);
                             window.showToast('티어 정보 자동 갱신 완료', 'success');
                         }
@@ -781,7 +790,9 @@
             } else {
                 tierBadge.className = 'tier-badge unranked';
                 tierBadge.textContent = 'Unranked';
-                mmrValue.textContent = player.mmr || 1200;
+                // Unranked도 계산된 MMR(0점) 표시
+                const calculatedMMR = player.mmr !== undefined ? player.mmr : 0;
+                mmrValue.textContent = calculatedMMR;
                 rankDetail.innerHTML = '<span>배치 게임 미완료 또는 언랭크</span>';
             }
             
@@ -804,13 +815,25 @@
                         puuid: currentSummonerData.player.puuid
                     })
                 });
-                const result = await resp.json();
+                const rankResult = await resp.json();
                 
-                if (!resp.ok) throw new Error(result.error || '티어 갱신 실패');
+                if (!resp.ok) throw new Error(rankResult.error || '티어 갱신 실패');
                 
-                // 결과 갱신 표시
-                showSummonerResult({ ...currentSummonerData, player: result.player });
-                window.showToast('티어 정보 갱신 완료', 'success');
+                if (rankResult.rank) {
+                    // 티어/랭크/LP 데이터 병합 (기존 player 데이터 보존)
+                    currentSummonerData.player = {
+                        ...currentSummonerData.player,
+                        tier: rankResult.rank.tier,
+                        rank: rankResult.rank.rank,
+                        leaguePoints: rankResult.rank.leaguePoints,
+                        wins: rankResult.rank.wins,
+                        losses: rankResult.rank.losses,
+                        queueType: rankResult.rank.queueType,
+                        mmr: calculateMMRFromTier(rankResult.rank.tier, rankResult.rank.rank, rankResult.rank.leaguePoints)
+                    };
+                    showSummonerResult(currentSummonerData);
+                    window.showToast('티어 정보 갱신 완료', 'success');
+                }
             } catch (err) {
                 console.error('티어 갱신 에러:', err);
                 window.showToast(err.message, 'error');

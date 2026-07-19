@@ -23,33 +23,50 @@ async function riotFetch(url) {
   return response.json();
 }
 
-// Calculate MMR from tier/rank/LP (same logic as db.sql)
+// Calculate MMR from tier/rank/LP (matches frontend calculateMMRFromTier logic)
+// Iron ~ Diamond: tier base + division bonus (IV=0, III=2.5, II=5, I=7.5) - NO LP bonus
+// Master/Grandmaster/Challenger: base 70 + LP/50 * 2.5
 function calculateMMR(tier, rank, leaguePoints) {
-  const tierMap = {
-    IRON: 800,
-    BRONZE: 900,
-    SILVER: 1000,
-    GOLD: 1100,
-    PLATINUM: 1200,
-    EMERALD: 1300,
-    DIAMOND: 1400,
-    MASTER: 1600,
-    GRANDMASTER: 1800,
-    CHALLENGER: 2000,
+  const tierUpper = (tier || 'UNRANKED').toUpperCase();
+  const rankUpper = (rank || 'IV').toUpperCase();
+  const lp = parseInt(leaguePoints) || 0;
+  
+  // 1. 에메랄드 티어 반영 (마스터는 70점부터 시작해야 점수 역전이 없음)
+  const tierBaseScores = {
+    'IRON': 0,
+    'BRONZE': 10,
+    'SILVER': 20,
+    'GOLD': 30,
+    'PLATINUM': 40,
+    'EMERALD': 50,
+    'DIAMOND': 60,
+    'MASTER': 70,       
+    'GRANDMASTER': 70,  // 마스터 이상은 모두 70점을 베이스로 LP로만 계산
+    'CHALLENGER': 70,
+    'UNRANKED': 0
   };
   
-  const rankMap = {
-    IV: 0,
-    III: 25,
-    II: 50,
-    I: 75,
+  // 2. 디비전 보너스 (아이언~다이아 전용)
+  const divisionBonus = {
+    'IV': 0,
+    'III': 2.5,
+    'II': 5,
+    'I': 7.5,
+    '': 0
   };
   
-  const baseMMR = tierMap[tier?.toUpperCase()] || 1200;
-  const rankBonus = rankMap[rank] || 0;
-  const lpBonus = Math.min(leaguePoints / 2, 50);
+  const baseScore = tierBaseScores[tierUpper] || 0;
   
-  return Math.round(baseMMR + rankBonus + lpBonus);
+  // 3. 마스터, 그마, 챌린저 (오직 누적 LP로만 계산)
+  if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tierUpper)) {
+    // 예: 그마 350LP -> (350 / 50) * 2.5 = 17.5점 추가
+    const lpBonus = (lp / 50) * 2.5;
+    return Math.round((baseScore + lpBonus) * 10) / 10;
+  }
+  
+  // 4. 아이언 ~ 다이아 (LP 계산 없이 4~1티어 점수만 깔끔하게 합산)
+  const divBonus = divisionBonus[rankUpper] || 0;
+  return baseScore + divBonus; 
 }
 
 export default async function handler(req, res) {
@@ -99,8 +116,8 @@ export default async function handler(req, res) {
     const leagues = await riotFetch(leagueUrl);
 
     if (!leagues || leagues.length === 0) {
-      // Unranked player - update with default values
-      const mmr = 1200;
+      // Unranked player - update with default values (MMR = 0 for unranked)
+      const mmr = calculateMMR('UNRANKED', '', 0);
       
       await supabase
         .from('players')
