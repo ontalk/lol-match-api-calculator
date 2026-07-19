@@ -377,42 +377,26 @@
             const rankUpper = (rank || 'IV').toUpperCase();
             const lp = parseInt(leaguePoints) || 0;
             
-            // 1. 에메랄드 티어 반영 (마스터는 70점부터 시작해야 점수 역전이 없음)
             const tierBaseScores = {
-                'IRON': 0,
-                'BRONZE': 10,
-                'SILVER': 20,
-                'GOLD': 30,
-                'PLATINUM': 40,
-                'EMERALD': 50,
-                'DIAMOND': 60,
-                'MASTER': 70,       
-                'GRANDMASTER': 70,  // 마스터 이상은 모두 70점을 베이스로 LP로만 계산
-                'CHALLENGER': 70,
-                'UNRANKED': 0
+                'IRON': 0, 'BRONZE': 10, 'SILVER': 20, 'GOLD': 30,
+                'PLATINUM': 40, 'EMERALD': 50, 'DIAMOND': 60,
+                'MASTER': 70, 'GRANDMASTER': 70, 'CHALLENGER': 70,
+                'UNRANKED': 1200
             };
             
-            // 2. 디비전 보너스 (아이언~다이아 전용)
-            const divisionBonus = {
-                'IV': 0,
-                'III': 2.5,
-                'II': 5,
-                'I': 7.5,
-                '': 0
-            };
+            const divisionBonus = { 'IV': 0, 'III': 2.5, 'II': 5, 'I': 7.5, '': 0 };
+            const baseScore = tierBaseScores[tierUpper] || 1200;
             
-            const baseScore = tierBaseScores[tierUpper] || 0;
-            
-            // 3. 마스터, 그마, 챌린저 (오직 누적 LP로만 계산)
+            if (baseScore === 1200) return 1200;
+
+            let finalMmr = 0;
             if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tierUpper)) {
-                // 예: 그마 350LP -> (350 / 50) * 2.5 = 17.5점 추가
-                const lpBonus = (lp / 50) * 2.5;
-                return Math.round((baseScore + lpBonus) * 10) / 10;
+                finalMmr = baseScore + ((lp / 50) * 2.5);
+            } else {
+                finalMmr = baseScore + (divisionBonus[rankUpper] || 0);
             }
             
-            // 4. 아이언 ~ 다이아 (LP 계산 없이 4~1티어 점수만 깔끔하게 합산)
-            const divBonus = divisionBonus[rankUpper] || 0;
-            return baseScore + divBonus; 
+            return Math.round(finalMmr);
         }
 
         // ========== 초기화 ==========
@@ -716,29 +700,26 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ gameName, tagLine })
                 });
-                const result = await resp.json();
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || '소환사 검색 실패');
                 
-                if (!resp.ok) throw new Error(result.error || '소환사 검색 실패');
+                currentSummonerData = data.player || data;
                 
-                // 소환사 기본 정보 저장
-                currentSummonerData = result;
+                // 🔥 AI가 뻗게 만들었던 에러 원천 차단 (안전하게 ID 찾기)
+                const targetId = currentSummonerData.encryptedSummonerId || currentSummonerData.id || (currentSummonerData.summoner && currentSummonerData.summoner.id);
                 
-                // 자동으로 티어/랭크 정보 가져오기 (MMR 계산을 위해 대기)
-                if (result.summoner?.id) {
+                if (targetId) {
                     try {
                         const rankResp = await fetch('/api/riot/rank', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                encryptedSummonerId: currentSummonerData.encryptedSummonerId || currentSummonerData.summoner.id
-                            })
+                            body: JSON.stringify({ encryptedSummonerId: targetId })
                         });
                         const rankData = await rankResp.json();
-
-                        if (rankResp.ok && rankData.rank) {
-                            const rawRank = rankData.rank;
+                        
+                        if (rankResp.ok) {
+                            const rawRank = rankData.rank || rankData; 
                             let soloRank = null;
-
                             if (Array.isArray(rawRank)) {
                                 soloRank = rawRank.find(r => r.queueType === 'RANKED_SOLO_5x5');
                                 if (!soloRank && rawRank.length > 0) soloRank = rawRank[0];
@@ -754,17 +735,14 @@
                                 currentSummonerData.losses = soloRank.losses;
                             }
                         }
-                    } catch (rankErr) {
-                        console.warn('티어 자동 갱신 실패:', rankErr.message);
+                    } catch (err) {
+                        console.warn('티어 갱신 튕김:', err);
                     }
                 }
-                
-                // 결과 표시 (티어 정보가 있으면 티어 기반 MMR, 없으면 기본값)
+
                 showSummonerResult(currentSummonerData);
                 window.showToast('소환사 검색 완료!', 'success');
-                
             } catch (err) {
-                console.error('소환사 검색 에러:', err);
                 window.showToast(err.message, 'error');
             } finally {
                 btn.disabled = false;
@@ -772,16 +750,14 @@
             }
         }
 
-        function showSummonerResult(result) {
-            const { player, summoner } = result;
+        ffunction showSummonerResult(player) {
             document.getElementById('resultName').textContent = player.gameName || player.name;
             document.getElementById('resultTag').textContent = `#${player.tagLine}`;
-            document.getElementById('resultLevel').textContent = `Lv. ${summoner.summonerLevel || player.summonerLevel || '?'}`;
+            document.getElementById('resultLevel').textContent = `Lv. ${player.summonerLevel || '?'}`;
             
-            const iconId = summoner.profileIconId || player.profileIconId;
+            const iconId = player.profileIconId || 0;
             document.getElementById('profileIcon').src = `https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${iconId}.png`;
             
-            // 티어 뱃지 업데이트
             const tierBadge = document.getElementById('tierBadge');
             const mmrValue = document.getElementById('mmrValue');
             const rankDetail = document.getElementById('rankDetail');
@@ -789,23 +765,101 @@
             if (player.tier && player.tier !== 'UNRANKED') {
                 tierBadge.className = `tier-badge ${player.tier.toLowerCase()}`;
                 tierBadge.textContent = formatTier(player.tier) + (player.rank ? ` ${player.rank}` : '');
-                mmrValue.textContent = player.mmr;
+                
+                const previewMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
+                mmrValue.textContent = previewMMR;
+                
                 rankDetail.innerHTML = `
                     <span>${player.leaguePoints || 0} LP</span>
                     <span>${player.wins || 0}승 ${player.losses || 0}패</span>
-                    <span>${player.queueType || 'RANKED_SOLO_5x5'}</span>
                 `;
             } else {
                 tierBadge.className = 'tier-badge unranked';
                 tierBadge.textContent = 'Unranked';
-                // Unranked도 계산된 MMR(0점) 표시
-                const calculatedMMR = player.mmr !== undefined ? player.mmr : 0;
-                mmrValue.textContent = calculatedMMR;
-                rankDetail.innerHTML = '<span>배치 게임 미완료 또는 언랭크</span>';
+                mmrValue.textContent = 1200;
+                rankDetail.innerHTML = '<span>배치 미완료 (기본 1200점)</span>';
             }
             
             document.getElementById('summonerResult').classList.remove('hidden');
         }
+
+        window.fetchRankForSummoner = async function(event) {
+            if (!currentSummonerData) return window.showToast('먼저 소환사를 검색하세요.', 'warning');
+            
+            const btn = document.querySelector('.result-actions .btn-secondary') || event.currentTarget;
+            if(btn) { btn.disabled = true; btn.innerHTML = '<span class="loading"></span>갱신 중...'; }
+            
+            const targetId = currentSummonerData.encryptedSummonerId || currentSummonerData.id || (currentSummonerData.summoner && currentSummonerData.summoner.id);
+
+            try {
+                const rankResp = await fetch('/api/riot/rank', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ encryptedSummonerId: targetId })
+                });
+                const rankData = await rankResp.json();
+                
+                if (!rankResp.ok) throw new Error(rankData.error || '티어 갱신 실패');
+                
+                const rawRank = rankData.rank || rankData;
+                let soloRank = null;
+                if (Array.isArray(rawRank)) {
+                    soloRank = rawRank.find(r => r.queueType === 'RANKED_SOLO_5x5');
+                    if (!soloRank && rawRank.length > 0) soloRank = rawRank[0];
+                } else {
+                    soloRank = rawRank;
+                }
+
+                if (soloRank && soloRank.tier) {
+                    currentSummonerData.tier = soloRank.tier;
+                    currentSummonerData.rank = soloRank.rank;
+                    currentSummonerData.leaguePoints = soloRank.leaguePoints;
+                    currentSummonerData.wins = soloRank.wins;
+                    currentSummonerData.losses = soloRank.losses;
+                }
+                showSummonerResult(currentSummonerData);
+                window.showToast('티어 정보 갱신 완료', 'success');
+            } catch (err) {
+                window.showToast(err.message, 'error');
+            } finally {
+                if(btn) { btn.disabled = false; btn.innerHTML = '🔄 티어 새로고침'; }
+            }
+        };
+
+        window.addSummonerToList = async function(autoParticipate = false) {
+            if (!currentSummonerData) return window.showToast('검색된 소환사가 없습니다.', 'warning');
+            
+            const player = currentSummonerData;
+            const calculatedMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
+            
+            const { data, error } = await sb.from('players').upsert({
+                puuid: player.puuid,
+                game_name: player.gameName || player.name,
+                tag_line: player.tagLine,
+                encrypted_summoner_id: player.encryptedSummonerId || player.id,
+                profile_icon_id: player.profileIconId,
+                summoner_level: player.summonerLevel,
+                tier: player.tier,
+                rank: player.rank,
+                league_points: player.leaguePoints,
+                wins: player.wins,
+                losses: player.losses,
+                mmr: calculatedMMR
+            }, { onConflict: 'puuid' }).select().single();
+            
+            if (error) {
+                console.error(error);
+                return window.showToast('명단 추가 실패: ' + error.message, 'error');
+            }
+            
+            window.showToast(`명단에 추가됨 (점수: ${calculatedMMR}점)`, 'success');
+            document.getElementById('summonerResult').classList.add('hidden');
+            currentSummonerData = null;
+            
+            if (autoParticipate && data) {
+                await sb.from('players').update({ is_participating: true, lock_team: 'none' }).eq('id', data.id);
+            }
+        };
 
         async function fetchRankForSummoner() {
             if (!currentSummonerData) return window.showToast('먼저 소환사를 검색하세요.', 'warning');
