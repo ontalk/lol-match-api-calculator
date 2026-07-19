@@ -622,8 +622,6 @@
                 if (!resp.ok) throw new Error(data.error || '소환사 검색 실패');
                 
                 currentSummonerData = data.player || data;
-                
-                // 🔥 무조건 PUUID만 사용하도록 수정!
                 const targetPuuid = currentSummonerData.puuid;
                 
                 if (targetPuuid) {
@@ -651,6 +649,21 @@
                                 currentSummonerData.leaguePoints = soloRank.leaguePoints;
                                 currentSummonerData.wins = soloRank.wins;
                                 currentSummonerData.losses = soloRank.losses;
+                                
+                                // 🔥 [핵심 추가 사항] 랭크를 찾자마자 데이터베이스를 그마 점수(154점)로 강제 업데이트!
+                                const calculatedMMR = calculateMMRFromTier(soloRank.tier, soloRank.rank, soloRank.leaguePoints);
+                                currentSummonerData.mmr = calculatedMMR;
+                                
+                                await sb.from('players').update({
+                                    tier: soloRank.tier,
+                                    rank: soloRank.rank,
+                                    league_points: soloRank.leaguePoints,
+                                    wins: soloRank.wins,
+                                    losses: soloRank.losses,
+                                    mmr: calculatedMMR
+                                }).eq('puuid', targetPuuid);
+                                
+                                loadPlayers(); // 리스트 즉시 새로고침
                             }
                         }
                     } catch (err) {
@@ -707,7 +720,6 @@
             const btn = document.querySelector('.result-actions .btn-secondary') || (event && event.currentTarget);
             if(btn) { btn.disabled = true; btn.innerHTML = '<span class="loading"></span>갱신 중...'; }
             
-            // 🔥 여기도 무조건 PUUID만 사용!
             const targetPuuid = currentSummonerData.puuid;
 
             try {
@@ -735,6 +747,19 @@
                     currentSummonerData.leaguePoints = soloRank.leaguePoints;
                     currentSummonerData.wins = soloRank.wins;
                     currentSummonerData.losses = soloRank.losses;
+
+                    // 🔥 새로고침 버튼 눌렀을 때도 DB 즉시 강제 업데이트!
+                    const calculatedMMR = calculateMMRFromTier(soloRank.tier, soloRank.rank, soloRank.leaguePoints);
+                    currentSummonerData.mmr = calculatedMMR;
+                    await sb.from('players').update({
+                        tier: soloRank.tier,
+                        rank: soloRank.rank,
+                        league_points: soloRank.leaguePoints,
+                        wins: soloRank.wins,
+                        losses: soloRank.losses,
+                        mmr: calculatedMMR
+                    }).eq('puuid', targetPuuid);
+                    loadPlayers();
                 }
                 showSummonerResult(currentSummonerData);
                 window.showToast('티어 정보 갱신 완료', 'success');
@@ -751,33 +776,27 @@
             const player = currentSummonerData;
             const calculatedMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
             
-            const { data, error } = await sb.from('players').upsert({
-                puuid: player.puuid,
-                game_name: player.gameName || player.name,
-                tag_line: player.tagLine,
-                encrypted_summoner_id: player.encryptedSummonerId || player.id,
-                profile_icon_id: player.profileIconId,
-                summoner_level: player.summonerLevel,
+            // 🔥 upsert 대신 안전한 update 사용 (에러 원천 차단)
+            const { error } = await sb.from('players').update({
                 tier: player.tier,
                 rank: player.rank,
                 league_points: player.leaguePoints,
                 wins: player.wins,
                 losses: player.losses,
-                mmr: calculatedMMR
-            }, { onConflict: 'puuid' }).select().single();
+                mmr: calculatedMMR,
+                is_participating: autoParticipate ? true : player.is_participating,
+                lock_team: autoParticipate ? 'none' : player.lock_team
+            }).eq('puuid', player.puuid);
             
             if (error) {
                 console.error(error);
                 return window.showToast('명단 추가 실패: ' + error.message, 'error');
             }
             
-            window.showToast(`명단에 추가됨 (점수: ${calculatedMMR}점)`, 'success');
+            window.showToast(`명단 갱신 완료 (점수: ${calculatedMMR}점)`, 'success');
             document.getElementById('summonerResult').classList.add('hidden');
             currentSummonerData = null;
-            
-            if (autoParticipate && data) {
-                await sb.from('players').update({ is_participating: true, lock_team: 'none' }).eq('id', data.id);
-            }
+            loadPlayers();
         };
 
         window.bulkAddToMatch = async function() {
