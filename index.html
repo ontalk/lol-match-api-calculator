@@ -371,12 +371,13 @@
          * Grandmaster: 60 + 17.5 (300LP 기준) + (LP-300)/50 * 2.5
          * Challenger: Grandmaster와 동일 계산
          */
+        // ========== 티어/랭크 기반 MMR 계산 함수 (버그 수정 완료) ==========
         function calculateMMRFromTier(tier, rank, leaguePoints) {
             const tierUpper = (tier || 'UNRANKED').toUpperCase();
             const rankUpper = (rank || 'IV').toUpperCase();
             const lp = parseInt(leaguePoints) || 0;
             
-            // 티어별 기본 점수 (IV 기준)
+            // 1. 에메랄드 티어 반영 (마스터는 70점부터 시작해야 점수 역전이 없음)
             const tierBaseScores = {
                 'IRON': 0,
                 'BRONZE': 10,
@@ -385,13 +386,13 @@
                 'PLATINUM': 40,
                 'EMERALD': 50,
                 'DIAMOND': 60,
-                'MASTER': 60,
-                'GRANDMASTER': 60 + 17.5, // Master 300LP = +17.5
-                'CHALLENGER': 60 + 17.5,
+                'MASTER': 70,       
+                'GRANDMASTER': 70,  // 마스터 이상은 모두 70점을 베이스로 LP로만 계산
+                'CHALLENGER': 70,
                 'UNRANKED': 0
             };
             
-            // 디비전 보너스 (IV=0, III=2.5, II=5, I=7.5)
+            // 2. 디비전 보너스 (아이언~다이아 전용)
             const divisionBonus = {
                 'IV': 0,
                 'III': 2.5,
@@ -401,24 +402,17 @@
             };
             
             const baseScore = tierBaseScores[tierUpper] || 0;
-            const divBonus = divisionBonus[rankUpper] || 0;
             
-            // Master 이상은 LP 기반 추가 점수
+            // 3. 마스터, 그마, 챌린저 (오직 누적 LP로만 계산)
             if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tierUpper)) {
-                // Master: 60점부터 시작, 50LP마다 2.5점
-                // Grandmaster: 300LP부터 시작 (이미 17.5점 포함), 추가 LP마다 2.5점/50LP
-                // Challenger: 동일
-                let additionalLP = lp;
-                if (tierUpper === 'GRANDMASTER' || tierUpper === 'CHALLENGER') {
-                    additionalLP = Math.max(0, lp - 300); // 300LP 초과분만
-                }
-                const lpBonus = (additionalLP / 50) * 2.5;
-                return Math.round((baseScore + divBonus + lpBonus) * 10) / 10; // 소수점 1자리
+                // 예: 그마 350LP -> (350 / 50) * 2.5 = 17.5점 추가
+                const lpBonus = (lp / 50) * 2.5;
+                return Math.round((baseScore + lpBonus) * 10) / 10;
             }
             
-            // Iron ~ Diamond: LP 보너스 (50LP = 2.5점)
-            const lpBonus = (lp / 50) * 2.5;
-            return Math.round((baseScore + divBonus + lpBonus) * 10) / 10;
+            // 4. 아이언 ~ 다이아 (LP 계산 없이 4~1티어 점수만 깔끔하게 합산)
+            const divBonus = divisionBonus[rankUpper] || 0;
+            return baseScore + divBonus; 
         }
 
         // ========== 초기화 ==========
