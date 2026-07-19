@@ -724,41 +724,34 @@
                 currentSummonerData = result;
                 
                 // 자동으로 티어/랭크 정보 가져오기 (MMR 계산을 위해 대기)
-                if (result.summoner?.id && result.player?.puuid) {
+                if (result.summoner?.id) {
                     try {
                         const rankResp = await fetch('/api/riot/rank', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
-                                encryptedSummonerId: result.summoner.id,
-                                puuid: result.player.puuid
+                                encryptedSummonerId: currentSummonerData.encryptedSummonerId || currentSummonerData.summoner.id
                             })
                         });
                         const rankData = await rankResp.json();
-                        
-                        if (rankResp.ok) {
-                            // 🔥 배열(List)로 오든 객체로 오든 솔로랭크만 찾아내는 만능 코드
-                            const rawRank = rankData.rank || rankData;
+
+                        if (rankResp.ok && rankData.rank) {
+                            const rawRank = rankData.rank;
                             let soloRank = null;
 
                             if (Array.isArray(rawRank)) {
                                 soloRank = rawRank.find(r => r.queueType === 'RANKED_SOLO_5x5');
-                                if (!soloRank && rawRank.length > 0) soloRank = rawRank[0]; // 솔랭 없으면 자랭이라도
+                                if (!soloRank && rawRank.length > 0) soloRank = rawRank[0];
                             } else {
                                 soloRank = rawRank;
                             }
 
                             if (soloRank && soloRank.tier) {
-                                currentSummonerData.player = {
-                                    ...currentSummonerData.player,
-                                    tier: soloRank.tier,
-                                    rank: soloRank.rank,
-                                    leaguePoints: soloRank.leaguePoints,
-                                    wins: soloRank.wins,
-                                    losses: soloRank.losses,
-                                    queueType: soloRank.queueType,
-                                    mmr: rankData.mmr || calculateMMRFromTier(soloRank.tier, soloRank.rank, soloRank.leaguePoints)
-                                };
+                                currentSummonerData.tier = soloRank.tier;
+                                currentSummonerData.rank = soloRank.rank;
+                                currentSummonerData.leaguePoints = soloRank.leaguePoints;
+                                currentSummonerData.wins = soloRank.wins;
+                                currentSummonerData.losses = soloRank.losses;
                             }
                         }
                     } catch (rankErr) {
