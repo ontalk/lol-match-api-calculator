@@ -288,6 +288,27 @@
         </div>
     </div>
 
+    <!-- Riot API 연동 모달 -->
+    <div class="modal-overlay" id="riotLinkModal">
+        <div class="modal">
+            <h3>🔗 Riot API 연동</h3>
+            <p class="muted" style="margin-bottom: 15px;">수동 추가한 플레이어의 소환사 정보를 연동합니다.</p>
+            <input type="hidden" id="riotLinkPlayerId">
+            <div class="input-group">
+                <label>게임명 (Game Name)</label>
+                <input type="text" id="riotLinkGameName" placeholder="예: Hide on bush" autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label>태그 (Tag Line)</label>
+                <input type="text" id="riotLinkTagLine" placeholder="예: KR1" maxlength="5" style="text-transform: uppercase;">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeRiotLinkModal()">취소</button>
+                <button class="btn btn-primary" onclick="fetchAndLinkRiotData()">연동하기</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ========== 전역 변수 ==========
         let sb = null; 
@@ -296,6 +317,15 @@
         let currentSummonerData = null; 
 
         // ========== 티어/랭크 기반 MMR 계산 함수 ==========
+        /**
+         * 티어별 기본 점수:
+         * IRON: 0, BRONZE: 10, SILVER: 20, GOLD: 30, PLATINUM: 40, EMERALD: 50, DIAMOND: 60
+         * MASTER: 70, GRANDMASTER: 70, CHALLENGER: 70 (마스터 이상은 LP로만 계산)
+         * UNRANKED: 0 (수동 추가 시 기본값 1200 사용)
+         * 
+         * 디비전 보너스: IV=0, III=2.5, II=5, I=7.5
+         * 마스터+ LP 계산: (LP / 50) * 2.5
+         */
         function calculateMMRFromTier(tier, rank, leaguePoints) {
             const tierUpper = (tier || 'UNRANKED').toUpperCase();
             const rankUpper = (rank || 'IV').toUpperCase();
@@ -305,22 +335,26 @@
                 'IRON': 0, 'BRONZE': 10, 'SILVER': 20, 'GOLD': 30,
                 'PLATINUM': 40, 'EMERALD': 50, 'DIAMOND': 60,
                 'MASTER': 70, 'GRANDMASTER': 70, 'CHALLENGER': 70,
-                'UNRANKED': 1200
+                'UNRANKED': 0
             };
             
             const divisionBonus = { 'IV': 0, 'III': 2.5, 'II': 5, 'I': 7.5, '': 0 };
-            const baseScore = tierBaseScores[tierUpper] || 1200;
+            const baseScore = tierBaseScores[tierUpper] || 0;
             
-            if (baseScore === 1200) return 1200;
+            // UNRANKED인 경우: Riot API 연동 시 0점, 수동 추가 시 1200점 기본값은 호출부에서 처리
+            if (tierUpper === 'UNRANKED') return 0;
 
             let finalMmr = 0;
             if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tierUpper)) {
+                // 마스터 이상: 기본 70점 + (LP / 50) * 2.5
                 finalMmr = baseScore + ((lp / 50) * 2.5);
             } else {
+                // 아이언 ~ 다이아: 티어 기본점 + 디비전 보너스
                 finalMmr = baseScore + (divisionBonus[rankUpper] || 0);
             }
             
-            return Math.round(finalMmr);
+            // 소수점 첫째자리까지 반올림 (예: 72.5)
+            return Math.round(finalMmr * 10) / 10;
         }
 
         // ========== 초기화 ==========
@@ -365,6 +399,108 @@
                 toast.style.animation = 'slideInRight 0.3s ease reverse'; 
                 setTimeout(() => toast.remove(), 300); 
             }, 3000);
+        };
+
+        // ========== Riot API 연동 모달 ==========
+        window.openRiotLinkModal = function(playerId) {
+            document.getElementById('riotLinkPlayerId').value = playerId;
+            document.getElementById('riotLinkGameName').value = '';
+            document.getElementById('riotLinkTagLine').value = '';
+            document.getElementById('riotLinkModal').classList.add('active');
+        };
+
+        window.closeRiotLinkModal = function() {
+            document.getElementById('riotLinkModal').classList.remove('active');
+        };
+
+        window.fetchAndLinkRiotData = async function() {
+            const playerId = document.getElementById('riotLinkPlayerId').value;
+            const gameName = document.getElementById('riotLinkGameName').value.trim();
+            const tagLine = document.getElementById('riotLinkTagLine').value.trim().toUpperCase();
+            
+            if (!gameName || !tagLine) {
+                return window.showToast('게임명과 태그를 모두 입력하세요.', 'warning');
+            }
+
+            const btn = document.querySelector('#riotLinkModal .btn-primary');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>검색 중...';
+
+            try {
+                // 1. 소환사 검색
+                const resp = await fetch('/api/riot/summoner', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ gameName, tagLine })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || '소환사 검색 실패');
+
+                const player = data.player || data;
+                const targetPuuid = player.puuid;
+
+                // 2. 랭크 정보 조회
+                let tier = 'UNRANKED', rank = 'IV', leaguePoints = 0, wins = 0, losses = 0;
+                if (targetPuuid) {
+                    try {
+                        const rankResp = await fetch('/api/riot/rank', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ puuid: targetPuuid })
+                        });
+                        const rankData = await rankResp.json();
+                        if (rankResp.ok) {
+                            const rawRank = rankData.rank || rankData;
+                            let soloRank = null;
+                            if (Array.isArray(rawRank)) {
+                                soloRank = rawRank.find(r => r.queueType === 'RANKED_SOLO_5x5');
+                                if (!soloRank && rawRank.length > 0) soloRank = rawRank[0];
+                            } else {
+                                soloRank = rawRank;
+                            }
+                            if (soloRank && soloRank.tier) {
+                                tier = soloRank.tier;
+                                rank = soloRank.rank;
+                                leaguePoints = soloRank.leaguePoints;
+                                wins = soloRank.wins;
+                                losses = soloRank.losses;
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('티어 조회 실패:', err);
+                    }
+                }
+
+                // 3. MMR 계산
+                const calculatedMMR = calculateMMRFromTier(tier, rank, leaguePoints);
+
+                // 4. DB 업데이트
+                const updateData = {
+                    puuid: targetPuuid,
+                    game_name: player.gameName,
+                    tag_line: player.tagLine,
+                    profile_icon_id: player.profileIconId,
+                    summoner_level: player.summonerLevel,
+                    tier: tier,
+                    rank: rank,
+                    league_points: leaguePoints,
+                    wins: wins,
+                    losses: losses,
+                    mmr: calculatedMMR
+                };
+
+                const { error } = await sb.from('players').update(updateData).eq('id', playerId);
+                if (error) throw new Error('DB 업데이트 실패: ' + error.message);
+
+                window.showToast(`연동 완료! (${formatTier(tier)} ${rank}, ${calculatedMMR}점)`, 'success');
+                closeRiotLinkModal();
+                loadPlayers();
+            } catch (err) {
+                window.showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '연동하기';
+            }
         };
 
         // ========== 실시간 구독 ==========
@@ -420,6 +556,7 @@
                             <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>A팀 고정</option>
                             <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀 고정</option>
                         </select>
+                        ${!p.puuid ? `<button class="btn-icon btn-add-participant" onclick="window.openRiotLinkModal('${p.id}')" title="Riot API 연동">🔗</button>` : ''}
                         <button class="btn-icon btn-add-participant" onclick="window.addToParticipants('${p.id}')" title="매칭 참가자 추가">➕</button>
                         <button class="btn-icon btn-delete" onclick="window.deletePlayer('${p.id}')" title="삭제">🗑️</button>
                     </div>
@@ -901,6 +1038,10 @@
         
         document.getElementById('editModal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) window.closeModal();
+        });
+        
+        document.getElementById('riotLinkModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) window.closeRiotLinkModal();
         });
         
         document.getElementById('gameName').addEventListener('keypress', (e) => { 
