@@ -645,16 +645,18 @@
 
         // ========== 라이엇 계정 연결 (수동 유저 전용, 안전한 UPDATE) ==========
         /**
-         * [버그 1 수정] 수동 등록된 플레이어의 Riot 계정을 연결.
+         * 수동 등록된 플레이어의 Riot 계정을 '덮어쓰기(UPDATE)' 로 연결.
          * - 시그니처: linkRiotAccount(playerId, gameName, tagLine)
-         * - /api/riot/summoner 로 puuid 획득
-         * - /api/riot/rank 로 솔로랭크 데이터 추출
+         * - /api/riot/summoner 로 puuid 획득 → /api/riot/rank 로 솔로랭크 데이터 추출
          * - calculateMMRFromTier 로 MMR 계산
-         * - [가장 중요] addSummonerToList 절대 호출 금지.
-         *   오직 sb.from('players').update({...}).eq('id', playerId) 로 덮어쓰기(UPDATE)만 수행.
-         * - [409 에러 방지] update 실행 후 반환된 error를 체크하여,
-         *   에러 코드가 '23505'이거나 409 충돌 에러면
-         *   window.showToast('이미 명단에 존재하는 롤 계정입니다.', 'error'); 후 함수 즉시 종료(return).
+         * - [가장 중요] addSummonerToList 절대 호출 금지. 오직 update().eq('id', playerId) UPDATE 만 사용.
+         * - [사전 중복 정리] puuid 획득 직후, DB에 같은 puuid(또는 game_name+tag_line)를 가진
+         *   '다른 행'이 있으면 기존 행의 라이엇 식별자를 null 로 정리(해제)한 뒤 연결.
+         *   → "삭제 후에도 계속 이미 있다고 뜨는" 현상과 "수동 추가 행에 연결 안 되는" 현상을 모두 해결.
+         * - [409 에러 방지] update 실행 후 반환된 error.code 가 정확히 '23505'(Postgres unique_violation)
+         *   이거나 status 가 409 일 때만 "이미 명단에 존재" 토스트 후 즉시 종료(return).
+         * - [affected rows 검증] update 후 .select() 로 실제 갱신된 행을 확인.
+         *   0행이면 playerId 가 잘못되었거나 행이 삭제된 것이므로 명확한 에러 안내.
          * - 성공하면 loadPlayers() 호출해 화면 갱신.
          */
         window.linkRiotAccount = async function(playerId, gameName, tagLine) {
@@ -730,13 +732,57 @@
                 // 3. MMR 계산 (반드시 DB 입력 전 실행)
                 const calculatedMMR = calculateMMRFromTier(tier, rank, leaguePoints);
 
-                // 4. 안전한 DB 업데이트 (UPDATE only, id 기준)
-                //    절대 addSummonerToList 호출 금지.
-                //    오직 update().eq('id', playerId)만 사용.
+                // 4. [사전 중복 정리] 같은 puuid(또는 game_name+tag_line)를 가진 '다른 행'이 있으면,
+                //    그 행의 라이엇 식별자(puuid/game_name/tag_line)를 null 로 정리(해제)한다.
+                //    이렇게 하면 현재 수동 추가한 행에 안전하게 연결(UPDATE)할 수 있다.
+                const finalGameName = playerInfo.gameName || gameName;
+                const finalTagLine  = playerInfo.tagLine  || tagLine;
+
+                const { data: dupRows, error: dupErr } = await sb.from('players')
+                    .select('id, name, game_name, tag_line, puuid')
+                    .or(`puuid.eq.${puuid},and(game_name.eq.${finalGameName},tag_line.eq.${finalTagLine})`);
+
+                if (dupErr) {
+                    console.warn('중복 조회 실패 (계속 진행):', dupErr);
+                } else if (dupRows && dupRows.length > 0) {
+                    const others = dupRows.filter(r => String(r.id) !== String(playerId));
+                    if (others.length > 0) {
+                        const names = others.map(r => r.name || r.game_name || '이름없음').join(', ');
+                        const ok = confirm(
+                            `이 롤 계정(${finalGameName}#${finalTagLine})은 이미 명단의 다른 항목[${names}]에 연결되어 있습니다.\n` +
+                            `기존 연결을 해제하고, 현재 선택한 항목에 이 계정을 연결하시겠습니까?\n` +
+                            `(기존 항목은 라이엇 연결이 해제될 뿐 삭제되지 않습니다.)`
+                        );
+                        if (!ok) {
+                            window.showToast('연결을 취소했습니다.', 'warning');
+                            return;
+                        }
+                        // 기존 행들의 라이엇 식별자 해제 (puuid, game_name, tag_line, tier, rank 등 초기화)
+                        for (const r of others) {
+                            await sb.from('players').update({
+                                puuid: null,
+                                game_name: null,
+                                tag_line: null,
+                                encrypted_summoner_id: null,
+                                tier: null,
+                                rank: null,
+                                league_points: 0,
+                                wins: 0,
+                                losses: 0,
+                                profile_icon_id: null,
+                                summoner_level: null
+                            }).eq('id', r.id);
+                        }
+                    }
+                }
+
+                // 5. 안전한 DB 업데이트 (UPDATE only, id 기준)
+                //    절대 addSummonerToList 호출 금지. 오직 update().eq('id', playerId) 만 사용.
+                //    name 필드는 updateData 에 넣지 않아 수동으로 추가한 이름(예: 'dd')이 보존된다.
                 const updateData = {
                     puuid: puuid,
-                    game_name: playerInfo.gameName || gameName,
-                    tag_line: playerInfo.tagLine || tagLine,
+                    game_name: finalGameName,
+                    tag_line: finalTagLine,
                     profile_icon_id: playerInfo.profileIconId || null,
                     summoner_level: playerInfo.summonerLevel || null,
                     tier: tier,
@@ -748,19 +794,32 @@
                     last_rank_update: new Date().toISOString()
                 };
 
-                const { error } = await sb.from('players').update(updateData).eq('id', playerId);
+                // .select() 로 영향받은 행을 반환받아 affected rows 검증
+                const { data: updated, error } = await sb.from('players')
+                    .update(updateData)
+                    .eq('id', playerId)
+                    .select('id, name');
                 
                 // [409 에러 방지] update 실행 후 반환된 error 체크
+                // 정확히 Postgres unique_violation(23505) 이거나 HTTP 409 일 때만 중복 안내
                 if (error) {
-                    if (error.code === '23505' || error.status === 409 || error.message.includes('23505') || error.message.includes('duplicate') || error.message.includes('unique') || error.message.includes('conflict')) {
+                    if (error.code === '23505' || error.status === 409) {
                         window.showToast('이미 명단에 존재하는 롤 계정입니다.', 'error');
                         return; // 앱이 터지지 않도록 즉시 종료
                     }
                     throw new Error('DB 업데이트 실패: ' + error.message);
                 }
 
-                // 5. 성공 → 화면 갱신
-                window.showToast(`연동 완료! (${formatTier(tier)} ${rank}, ${calculatedMMR}점)`, 'success');
+                // [affected rows 검증] 0행 갱신 = playerId 가 잘못되었거나 행이 이미 삭제됨
+                if (!updated || updated.length === 0) {
+                    window.showToast('해당 플레이어를 찾을 수 없습니다. 명단을 새로고침 후 다시 시도하세요.', 'error');
+                    loadPlayers();
+                    return;
+                }
+
+                // 6. 성공 → 화면 갱신
+                const targetName = updated[0].name || finalGameName;
+                window.showToast(`'${targetName}' 계정 연결 완료! (${formatTier(tier)} ${rank}, ${calculatedMMR}점)`, 'success');
                 loadPlayers(); // 즉시 갱신
 
             } catch (err) {
