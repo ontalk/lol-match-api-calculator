@@ -83,6 +83,8 @@
         .btn-icon:hover { transform: scale(1.1); }
         .btn-add-participant { background: rgba(46,204,113,0.2); color: #2ecc71; }
         .btn-add-participant:hover { background: #2ecc71; color: white; }
+        .btn-edit { background: rgba(52,152,219,0.2); color: #3498db; }
+        .btn-edit:hover { background: #3498db; color: white; }
         .btn-delete { background: rgba(231,76,60,0.2); color: #e74c3c; }
         .btn-delete:hover { background: #e74c3c; color: white; }
         
@@ -259,7 +261,10 @@
                 </details>
                 <div class="participants-section">
                     <div class="list-container">
-                        <h4 style="color: #e94560; margin: 0 0 10px;">🔴 A팀 고정 / 🔵 B팀 고정 / ⚪ 미정</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #e94560; margin: 0;">🔴 A팀 고정 / 🔵 B팀 고정 / ⚪ 미정</h4>
+                            <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="clearAllParticipants()">🗑️ 전체 빼기</button>
+                        </div>
                         <div class="participant-list-container" id="participantListContainer">
                             <ul class="player-list" id="participantList"></ul>
                         </div>
@@ -297,7 +302,8 @@
 
     <div class="modal-overlay" id="editModal">
         <div class="modal">
-            <h3>✏️ MMR 수정</h3>
+            <h3>✏️ MMR 수동 수정</h3>
+            <p style="font-size: 12px; color: #aaa;">주의: 라이엇 계정의 점수를 억지로 바꾸면 자동 업데이트 방지를 위해 '수동 티어(Unranked)'로 전환됩니다.</p>
             <input type="hidden" id="editPlayerId">
             <input type="number" id="editMmrInput" placeholder="새 MMR 점수" min="0" max="3000">
             <div class="modal-actions">
@@ -313,7 +319,7 @@
         let allPlayersCache = [];
         let participatingPlayers = [];
         let currentSummonerData = null; 
-        let linkingInProgress = new Set(); // 중복 연동 요청 방지
+        let linkingInProgress = new Set(); 
 
         // ========== 티어/랭크 기반 MMR 계산 함수 ==========
         function calculateMMRFromTier(tier, rank, leaguePoints) {
@@ -430,7 +436,7 @@
                         <div>
                             <div class="player-name">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
                             ${p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : ''}
-                            ${p.tier ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                            ${p.tier && p.tier !== 'UNRANKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
                         </div>
                     </div>
                     <div class="player-mmr">${p.mmr}</div>
@@ -441,6 +447,7 @@
                             <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀 고정</option>
                         </select>
                         <button class="btn-icon btn-add-participant" onclick="window.addToParticipants('${p.id}')" title="매칭 참가자 추가">➕</button>
+                        <button class="btn-icon btn-edit" onclick="window.editPlayer('${p.id}', '${p.mmr}')" title="점수 수동 수정">✏️</button>
                         <button class="btn-icon btn-delete" onclick="window.deletePlayer('${p.id}')" title="삭제">🗑️</button>
                     </div>
                     ${!p.puuid ? `
@@ -472,7 +479,7 @@
                         <div>
                             <div class="player-name">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
                             ${p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : ''}
-                            ${p.tier ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                            ${p.tier && p.tier !== 'UNRANKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
                         </div>
                     </div>
                     <div class="player-mmr">${p.mmr}</div>
@@ -482,6 +489,7 @@
                             <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>A팀 고정</option>
                             <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀 고정</option>
                         </select>
+                        <button class="btn-icon btn-edit" onclick="window.editPlayer('${p.id}', '${p.mmr}')" title="점수 수동 수정">✏️</button>
                         <button class="btn-icon btn-delete" onclick="window.removeFromMatch('${p.id}')" title="참가 해제">✖</button>
                     </div>
                 </li>
@@ -514,7 +522,7 @@
                                 <div class="player-name" style="font-size:14px;">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
                                 ${p.game_name && p.tag_line ? `<div class="player-tag" style="font-size:10px;">${p.game_name}#${p.tag_line}</div>` : ''}
                             </div>
-                            ${p.tier ? `<span class="team-player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                            ${p.tier && p.tier !== 'UNRANKED' ? `<span class="team-player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
                         </div>
                         <div class="team-player-mmr">${p.mmr}</div>
                     </li>
@@ -528,7 +536,6 @@
             document.getElementById('participantCount').textContent = `참가자: ${participatingPlayers.length}/10`;
         }
 
-        // [핵심 변경] 9명 이하일 때 / 11명일 때 텍스트 및 버튼 실시간 업데이트 로직
         function updateMakeTeamsButton() {
             const btn = document.getElementById('makeTeamsBtn');
             const msg = document.getElementById('makeTeamsMsg');
@@ -537,15 +544,15 @@
             if (count === 10) {
                 btn.disabled = false;
                 msg.textContent = "✅ 10명이 모였습니다! 가장 공평한 밸런스로 팀을 나눕니다.";
-                msg.style.color = "#2ecc71"; // 초록색
+                msg.style.color = "#2ecc71";
             } else if (count > 10) {
                 btn.disabled = true;
                 msg.textContent = `❌ 현재 ${count}명입니다. 매칭은 정확히 10명만 가능합니다.`;
-                msg.style.color = "#e74c3c"; // 빨간색
+                msg.style.color = "#e74c3c";
             } else {
                 btn.disabled = true;
                 msg.textContent = `⚠️ 현재 ${count}명입니다. 5:5 매칭을 위해 ${10 - count}명이 더 필요합니다.`;
-                msg.style.color = "#aaa"; // 회색
+                msg.style.color = "#aaa";
             }
         }
 
@@ -602,7 +609,6 @@
             await sb.from('players').update({ lock_team: team }).eq('id', id);
         };
 
-        // [핵심 변경] 참가자 11명 초과 등록 원천 차단
         window.addToParticipants = async function(id) {
             if (participatingPlayers.length >= 10) {
                 window.showToast('더 이상 추가할 수 없습니다! 5:5 매칭은 최대 10명까지만 가능합니다.', 'error');
@@ -624,12 +630,30 @@
             }).eq('id', id);
         };
 
+        // [핵심 추가] 전체 빼기 버튼 기능
+        window.clearAllParticipants = async function() {
+            if (participatingPlayers.length === 0) {
+                return window.showToast('명단에 참가자가 없습니다.', 'warning');
+            }
+            if (!confirm('현재 매칭 참가자를 모두 명단에서 빼시겠습니까?')) return;
+            
+            const ids = participatingPlayers.map(p => p.id);
+            await sb.from('players').update({ 
+                is_participating: false, 
+                lock_team: 'none', 
+                assigned_team: null 
+            }).in('id', ids);
+            
+            window.showToast('참가자가 모두 초기화되었습니다.', 'success');
+        };
+
         window.deletePlayer = async function(id) {
             if (!confirm('삭제하시겠습니까?')) return;
             await sb.from('players').delete().eq('id', id);
         };
 
-        window.editPlayer = function(id, name, currentMmr) {
+        // [핵심 추가] 점수 수동 편집 
+        window.editPlayer = function(id, currentMmr) {
             document.getElementById('editPlayerId').value = id;
             document.getElementById('editMmrInput').value = currentMmr;
             document.getElementById('editModal').classList.add('active');
@@ -644,9 +668,15 @@
             const mmr = parseInt(document.getElementById('editMmrInput').value);
             if (isNaN(mmr)) return window.showToast('올바른 숫자를 입력하세요.', 'warning');
             
-            await sb.from('players').update({ mmr }).eq('id', id);
-            window.closeModal();
-            window.showToast('MMR 수정됨', 'success');
+            // 데이터베이스 트리거가 티어를 보고 점수를 다시 원상복구 시키는 것을 막기 위해,
+            // 수동으로 점수를 조작하면 티어를 UNRANKED로 바꿔서 고정시킵니다.
+            const { error } = await sb.from('players').update({ mmr: mmr, tier: 'UNRANKED' }).eq('id', id);
+            if(error) {
+                window.showToast('수정 실패: ' + error.message, 'error');
+            } else {
+                window.closeModal();
+                window.showToast('MMR 수동 변경 완료 (티어 표시는 숨겨집니다)', 'success');
+            }
         };
 
         // ========== 라이엇 계정 연결 (수동 유저 전용) ==========
@@ -721,7 +751,7 @@
                 const finalGameName = playerInfo.gameName || gameName;
                 const finalTagLine  = playerInfo.tagLine  || tagLine;
 
-                // 3. 중복 행 "완전 삭제(병합)" 로직
+                // 3. 중복 행 병합 로직
                 const { data: dupRows, error: dupErr } = await sb.from('players')
                     .select('id, name, game_name, tag_line, puuid')
                     .or(`puuid.eq.${puuid},and(game_name.eq.${finalGameName},tag_line.eq.${finalTagLine})`);
@@ -744,7 +774,7 @@
                     }
                 }
 
-                // 4. 안전한 DB 업데이트
+                // 4. DB 덮어쓰기
                 const updateData = {
                     puuid: puuid,
                     game_name: finalGameName,
@@ -983,7 +1013,6 @@
         window.addSummonerToList = async function(autoParticipate = false) {
             if (!currentSummonerData) return window.showToast('검색된 소환사가 없습니다.', 'warning');
             
-            // [11명 제한] 추가하고 참가하기를 눌렀는데 이미 10명인 경우
             if (autoParticipate && participatingPlayers.length >= 10) {
                 window.showToast('이미 참가자가 10명이어서 매칭에는 참여할 수 없습니다. (명단에만 추가됩니다)', 'error');
                 autoParticipate = false;
@@ -1014,7 +1043,6 @@
             };
 
             try {
-                // 1차: puuid로 업데이트
                 let updateResult = await sb.from('players')
                     .update({ ...riotPayload, ...participationPayload })
                     .eq('puuid', player.puuid)
@@ -1023,7 +1051,6 @@
                 let updatedRow = (updateResult.data && updateResult.data[0]) || null;
                 if (updateResult.error) throw updateResult.error;
 
-                // 2차: 상단 검색을 통해 명단 추가를 눌렀는데, 이미 똑같은 이름을 가진 "수동 인원"이 있다면 합칩니다.
                 if (!updatedRow && finalGameName) {
                     const { data: matched, error: matchErr } = await sb.from('players')
                         .select('id, name, puuid')
@@ -1042,7 +1069,6 @@
                     }
                 }
 
-                // 3차: 매칭되는 행이 없으면 새로운 데이터로 추가
                 if (!updatedRow) {
                     const { data: insData, error: insErr } = await sb.from('players').insert({
                         puuid: player.puuid,
@@ -1083,7 +1109,6 @@
             }
         };
 
-        // [핵심 변경] 일괄 등록 시 11명 초과 방지
         window.bulkAddToMatch = async function() {
             const text = document.getElementById('bulkParticipants').value.trim();
             if (!text) return window.showToast('이름을 입력하세요.', 'warning');
@@ -1112,7 +1137,6 @@
             window.showToast(`${ids.length}명 참가자로 추가됨`, 'success');
         };
 
-        // ========== 가장 공평하게 5:5 밸런스를 맞추는 알고리즘 ==========
         window.makeTeams = async function() {
             if (participatingPlayers.length !== 10) return window.showToast('정확히 10명이어야 합니다.', 'warning');
             
@@ -1122,7 +1146,7 @@
 
             try {
                 const totalPlayers = participatingPlayers.length;
-                const targetSize = Math.floor(totalPlayers / 2); // 무조건 5명
+                const targetSize = Math.floor(totalPlayers / 2);
                 const totalScore = participatingPlayers.reduce((sum, p) => sum + p.mmr, 0);
 
                 const forcedA = participatingPlayers.filter(p => p.lock_team === 'A');
@@ -1138,7 +1162,6 @@
                 let bestDiff = Infinity;
                 let bestCombinations = [];
 
-                // 모든 경우의 수(최대 252개)를 계산하여 양 팀 점수 차이가 가장 작은 최적의 밸런스를 찾아냅니다.
                 function dfs(index, chosen, currentSum) {
                     if (chosen.length === needA) {
                         const sumA = forcedASum + currentSum;
@@ -1176,7 +1199,6 @@
                 await sb.from('players').update({ assigned_team: 'A' }).in('id', teamAIds);
                 await sb.from('players').update({ assigned_team: 'B' }).in('id', teamBIds);
                 
-                // [안내 메시지 강화]
                 window.showToast(`가장 공평한 매칭 완료! (팀 점수 차이: ${bestDiff}점)`, 'success');
             } catch (err) {
                 window.showToast(err.message, 'error');
