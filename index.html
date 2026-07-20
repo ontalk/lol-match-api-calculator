@@ -221,7 +221,7 @@
         let participatingPlayers = [];
         let linkingInProgress = new Set(); 
 
-        // ========== 티어/랭크 기반 MMR 계산 함수 (정수 완벽 변환 처리 적용) ==========
+        // ========== 티어/랭크 기반 MMR 계산 함수 ==========
         function calculateMMRFromTier(tier, rank, leaguePoints) {
             const tierUpper = (tier || 'UNRANKED').toUpperCase();
             const rankUpper = (rank || 'IV').toUpperCase();
@@ -231,13 +231,13 @@
                 'IRON': 0, 'BRONZE': 10, 'SILVER': 20, 'GOLD': 30,
                 'PLATINUM': 40, 'EMERALD': 50, 'DIAMOND': 60,
                 'MASTER': 70, 'GRANDMASTER': 70, 'CHALLENGER': 70,
-                'UNRANKED': 0, 'LOCKED': 0
+                'UNRANKED': 0
             };
             
             const divisionBonus = { 'IV': 0, 'III': 2.5, 'II': 5, 'I': 7.5, '': 0 };
             const baseScore = tierBaseScores[tierUpper] || 0;
             
-            if (tierUpper === 'UNRANKED' || tierUpper === 'LOCKED') return 0;
+            if (tierUpper === 'UNRANKED') return 0;
 
             let finalMmr = 0;
             if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tierUpper)) {
@@ -246,7 +246,6 @@
                 finalMmr = baseScore + (divisionBonus[rankUpper] || 0);
             }
             
-            // 데이터베이스 충돌(invalid syntax integer)을 막기 위해 무조건 정수로 반올림
             return Math.round(finalMmr);
         }
 
@@ -303,29 +302,17 @@
         }
 
         async function loadPlayers() {
-            const { data, error } = await sb.from('players').select('*');
+            const { data, error } = await sb.from('players').select('*').order('mmr', { ascending: false });
             if (error) { 
                 console.error(error); 
                 window.showToast('데이터 로드 실패: ' + error.message, 'error'); 
                 return; 
             }
             
-            let players = data || [];
-            
-            // 🔥 [가장 핵심 로직] DB의 강제 초기화(1200점)를 피해, 프로필 아이콘에 숨겨둔 마이너스 점수를 꺼내옵니다.
-            players.forEach(p => {
-                if (p.tier === 'LOCKED' && p.profile_icon_id !== null && p.profile_icon_id <= -10000) {
-                    p.mmr = Math.abs(p.profile_icon_id) - 10000;
-                }
-            });
-            
-            // 점수순 정렬
-            players.sort((a, b) => b.mmr - a.mmr);
-
-            allPlayersCache = players;
-            renderPlayerList(players);
-            renderParticipantList(players);
-            renderTeams(players);
+            allPlayersCache = data || [];
+            renderPlayerList(data || []);
+            renderParticipantList(data || []);
+            renderTeams(data || []);
             updateParticipantCount();
             updateMakeTeamsButton();
         }
@@ -342,13 +329,15 @@
                 <li class="player-item ${p.lock_team === 'A' ? 'locked-a' : ''} ${p.lock_team === 'B' ? 'locked-b' : ''}" data-id="${p.id}" style="flex-wrap: wrap;">
                     <div class="player-main">
                         <div class="player-avatar">
-                            ${p.profile_icon_id !== null && p.profile_icon_id >= 0 ? `<img src="https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${p.profile_icon_id}.png" alt="">` : '👤'}
+                            ${p.profile_icon_id !== null ? `<img src="https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${p.profile_icon_id}.png" alt="">` : '👤'}
                         </div>
                         <div>
                             <div class="player-name">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
                             ${p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : ''}
-                            ${p.tier && p.tier !== 'UNRANKED' && p.tier !== 'LOCKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                            ${p.tier === 'LOCKED' ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 점수 고정됨</span>` : ''}
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                ${p.tier && p.tier !== 'UNRANKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                                ${p.wins < 0 ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 점수 고정됨</span>` : ''}
+                            </div>
                         </div>
                     </div>
                     <div class="player-mmr">${p.mmr}</div>
@@ -359,7 +348,7 @@
                             <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀</option>
                         </select>
                         <button class="btn-icon btn-add-participant" onclick="window.addToParticipants('${p.id}')" title="참가자 추가">➕</button>
-                        <button class="btn-icon ${p.tier === 'LOCKED' ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', '${p.tier}', ${p.mmr})" title="점수 고정 켜기/끄기">${p.tier === 'LOCKED' ? '🔒' : '🔓'}</button>
+                        <button class="btn-icon ${p.wins < 0 ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.wins})" title="점수 고정 켜기/끄기">${p.wins < 0 ? '🔒' : '🔓'}</button>
                         <button class="btn-icon btn-edit" onclick="window.editPlayer('${p.id}', '${p.mmr}')" title="점수 수정">✏️</button>
                         <button class="btn-icon btn-delete" onclick="window.deletePlayer('${p.id}')" title="삭제">🗑️</button>
                     </div>
@@ -387,13 +376,15 @@
                     <div class="player-main">
                         <span style="color:#f0c808; font-weight:bold; min-width:24px;">${idx + 1}.</span>
                         <div class="player-avatar">
-                            ${p.profile_icon_id !== null && p.profile_icon_id >= 0 ? `<img src="https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${p.profile_icon_id}.png" alt="">` : '👤'}
+                            ${p.profile_icon_id !== null ? `<img src="https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${p.profile_icon_id}.png" alt="">` : '👤'}
                         </div>
                         <div>
                             <div class="player-name">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
                             ${p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : ''}
-                            ${p.tier && p.tier !== 'UNRANKED' && p.tier !== 'LOCKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                            ${p.tier === 'LOCKED' ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                ${p.tier && p.tier !== 'UNRANKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                                ${p.wins < 0 ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
+                            </div>
                         </div>
                     </div>
                     <div class="player-mmr">${p.mmr}</div>
@@ -403,7 +394,7 @@
                             <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>A팀</option>
                             <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀</option>
                         </select>
-                        <button class="btn-icon ${p.tier === 'LOCKED' ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', '${p.tier}', ${p.mmr})" title="점수 고정 켜기/끄기">${p.tier === 'LOCKED' ? '🔒' : '🔓'}</button>
+                        <button class="btn-icon ${p.wins < 0 ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.wins})" title="점수 고정 켜기/끄기">${p.wins < 0 ? '🔒' : '🔓'}</button>
                         <button class="btn-icon btn-edit" onclick="window.editPlayer('${p.id}', '${p.mmr}')" title="점수 수정">✏️</button>
                         <button class="btn-icon btn-delete" onclick="window.removeFromMatch('${p.id}')" title="명단으로 내리기">✖</button>
                     </div>
@@ -431,14 +422,16 @@
                         <div class="team-player-info">
                             <span style="color:#f0c808; font-weight:bold; min-width:20px;">${idx + 1}.</span>
                             <div class="player-avatar" style="width:28px; height:28px;">
-                                ${p.profile_icon_id !== null && p.profile_icon_id >= 0 ? `<img src="https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${p.profile_icon_id}.png" alt="">` : '👤'}
+                                ${p.profile_icon_id !== null ? `<img src="https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${p.profile_icon_id}.png" alt="">` : '👤'}
                             </div>
                             <div>
                                 <div class="player-name" style="font-size:14px;">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
                                 ${p.game_name && p.tag_line ? `<div class="player-tag" style="font-size:10px;">${p.game_name}#${p.tag_line}</div>` : ''}
                             </div>
-                            ${p.tier && p.tier !== 'UNRANKED' && p.tier !== 'LOCKED' ? `<span class="team-player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                            ${p.tier === 'LOCKED' ? `<span class="team-player-rank" style="color:#f39c12; background:rgba(243,156,18,0.15);">🔒</span>` : ''}
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                ${p.tier && p.tier !== 'UNRANKED' ? `<span class="team-player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                                ${p.wins < 0 ? `<span class="team-player-rank" style="color:#f39c12; background:rgba(243,156,18,0.15);">🔒</span>` : ''}
+                            </div>
                         </div>
                         <div class="team-player-mmr">${p.mmr}</div>
                     </li>
@@ -491,12 +484,7 @@
             const mmr = parseInt(document.getElementById('playerMmr').value) || 1200;
             if (!name) return window.showToast('이름을 입력하세요.', 'warning');
             
-            // DB 트리거를 속이기 위해 점수를 음수화해서 보냅니다.
-            const { error } = await sb.from('players').insert({ 
-                name: name,
-                tier: 'LOCKED',
-                profile_icon_id: -(mmr + 10000)
-            });
+            const { error } = await sb.from('players').insert({ name, mmr });
             if (error) { console.error(error); window.showToast('추가 실패: ' + error.message, 'error'); return; }
             
             document.getElementById('playerName').value = '';
@@ -515,11 +503,7 @@
                 const mmr = parseInt(parts.pop()) || 1200;
                 const name = parts.join(' ');
                 if (name) {
-                    players.push({ 
-                        name: name, 
-                        tier: 'LOCKED', 
-                        profile_icon_id: -(mmr + 10000)
-                    });
+                    players.push({ name: name, mmr: mmr });
                 }
             }
             if (players.length === 0) return window.showToast('올바른 데이터가 없습니다.', 'warning');
@@ -535,16 +519,16 @@
             await sb.from('players').update({ lock_team: team }).eq('id', id);
         };
         
-        // 🔒 버튼: 점수 고정 토글 기능
-        window.toggleMmrLock = async function(id, currentTier, currentMmr) {
-            if (currentTier === 'LOCKED') {
-                // 고정 해제 -> 언랭 상태로 돌리고 아이콘 정상화 (이후 티어 갱신하면 복구됨)
-                const { error } = await sb.from('players').update({ tier: 'UNRANKED', profile_icon_id: 0 }).eq('id', id);
-                if (!error) window.showToast('🔓 점수 고정이 해제되었습니다. (티어 갱신 시 다시 라이엇 점수가 적용됩니다)', 'success');
+        // 🔥 [완벽 수정] 🔒 점수 고정 토글 (wins 값을 -1 로 바꿔서 구분)
+        window.toggleMmrLock = async function(id, currentWins) {
+            if (currentWins < 0) {
+                // 고정 해제 -> wins를 0으로 돌려놓음
+                const { error } = await sb.from('players').update({ wins: 0 }).eq('id', id);
+                if (!error) window.showToast('🔓 점수 고정이 해제되었습니다.', 'success');
             } else {
-                // 고정 걸기 -> 현재 점수를 숨겨서 고정
-                const { error } = await sb.from('players').update({ tier: 'LOCKED', profile_icon_id: -(currentMmr + 10000) }).eq('id', id);
-                if (!error) window.showToast('🔒 점수가 고정되었습니다. (티어를 갱신해도 보호됩니다)', 'success');
+                // 고정 걸기 -> wins를 -1로 만듦 (실제 데이터 훼손 없음)
+                const { error } = await sb.from('players').update({ wins: -1 }).eq('id', id);
+                if (!error) window.showToast('🔒 점수가 고정되었습니다.', 'success');
             }
         };
 
@@ -585,15 +569,15 @@
             document.getElementById('editModal').classList.remove('active');
         };
 
-        // 수동 편집 시 DB 감시를 피하기 위해 점수 숨김 암호화 처리
+        // 🔥 [완벽 수정] 수동 점수 편집 시, wins를 -1로 바꿔서 아이콘/티어 보존하면서 고정만 시킴
         window.saveMmr = async function() {
             const id = document.getElementById('editPlayerId').value;
             const mmr = parseInt(document.getElementById('editMmrInput').value);
             if (isNaN(mmr)) return window.showToast('올바른 숫자를 입력하세요.', 'warning');
             
             const { error } = await sb.from('players').update({ 
-                tier: 'LOCKED', 
-                profile_icon_id: -(mmr + 10000) 
+                mmr: mmr,
+                wins: -1 // 승수를 음수로 만들어서 고정(🔒) 상태로 만듦
             }).eq('id', id);
             
             if(error) {
@@ -606,9 +590,9 @@
 
         // ========== 전체 명단 티어 일괄 갱신 ==========
         window.syncAllTiers = async function() {
-            // [방어막 적용] LOCKED 처리된 사람들은 갱신하지 않고 보호합니다!
-            const playersToSync = allPlayersCache.filter(p => p.puuid && p.tier !== 'LOCKED');
-            const lockedCount = allPlayersCache.filter(p => p.puuid && p.tier === 'LOCKED').length;
+            // [방어막 적용] wins가 0 미만(즉 -1)인 사람은 고정(🔒)된 사람이므로 갱신 대상에서 제외!
+            const playersToSync = allPlayersCache.filter(p => p.puuid && p.wins >= 0);
+            const lockedCount = allPlayersCache.filter(p => p.puuid && p.wins < 0).length;
 
             if (playersToSync.length === 0) {
                 if (lockedCount > 0) return window.showToast(`현재 명단의 라이엇 계정은 모두 고정(🔒)되어 있어 갱신할 내용이 없습니다.`, 'warning');
@@ -616,7 +600,7 @@
             }
             
             let msg = `명단에 등록된 ${playersToSync.length}명의 점수를 최신화하시겠습니까?\n(시간이 약간 소요될 수 있습니다)`;
-            if (lockedCount > 0) msg += `\n\n※ 점수가 고정(🔒)된 ${lockedCount}명은 갱신에서 보호됩니다.`;
+            if (lockedCount > 0) msg += `\n\n※ 점수가 고정(🔒)된 ${lockedCount}명은 갱신에서 안전하게 보호됩니다.`;
 
             if (!confirm(msg)) return;
 
@@ -754,7 +738,9 @@
                 const updateData = {
                     puuid: puuid, game_name: finalGameName, tag_line: finalTagLine,
                     profile_icon_id: playerInfo.profileIconId || null, summoner_level: playerInfo.summonerLevel || null,
-                    tier: tier, rank: rank, league_points: leaguePoints, wins: wins, losses: losses,
+                    tier: tier, rank: rank, league_points: leaguePoints, 
+                    wins: wins, // 계정 연결 시 다시 정상 승리 수로 덮어쓰므로 자동 잠금(Lock)이 해제됨!
+                    losses: losses,
                     mmr: calculatedMMR, last_rank_update: new Date().toISOString()
                 };
 
