@@ -174,7 +174,7 @@
                 <span id="statusText">초기화 중...</span>
             </div>
             <div class="status-item">
-                <span id="participantCount">참가자: 0/10</span>
+                <span id="participantCount" style="font-weight: 700; color: #f0c808;">참가자: 0/10</span>
             </div>
         </div>
 
@@ -269,7 +269,7 @@
                     <button class="btn btn-warning" style="padding: 15px 40px; font-size: 18px;" id="makeTeamsBtn" onclick="makeTeams()" disabled>
                         ⚖️ 공평하게 5:5 팀 나누기
                     </button>
-                    <p class="muted" style="margin-top: 8px;">참가자 10명일 때 활성화됩니다</p>
+                    <p id="makeTeamsMsg" class="muted" style="margin-top: 8px; font-weight: 600;">참가자 10명일 때 활성화됩니다</p>
                 </div>
             </div>
         </div>
@@ -528,9 +528,25 @@
             document.getElementById('participantCount').textContent = `참가자: ${participatingPlayers.length}/10`;
         }
 
+        // [핵심 변경] 9명 이하일 때 / 11명일 때 텍스트 및 버튼 실시간 업데이트 로직
         function updateMakeTeamsButton() {
             const btn = document.getElementById('makeTeamsBtn');
-            btn.disabled = participatingPlayers.length !== 10;
+            const msg = document.getElementById('makeTeamsMsg');
+            const count = participatingPlayers.length;
+
+            if (count === 10) {
+                btn.disabled = false;
+                msg.textContent = "✅ 10명이 모였습니다! 가장 공평한 밸런스로 팀을 나눕니다.";
+                msg.style.color = "#2ecc71"; // 초록색
+            } else if (count > 10) {
+                btn.disabled = true;
+                msg.textContent = `❌ 현재 ${count}명입니다. 매칭은 정확히 10명만 가능합니다.`;
+                msg.style.color = "#e74c3c"; // 빨간색
+            } else {
+                btn.disabled = true;
+                msg.textContent = `⚠️ 현재 ${count}명입니다. 5:5 매칭을 위해 ${10 - count}명이 더 필요합니다.`;
+                msg.style.color = "#aaa"; // 회색
+            }
         }
 
         // ========== 유틸 ==========
@@ -586,9 +602,10 @@
             await sb.from('players').update({ lock_team: team }).eq('id', id);
         };
 
+        // [핵심 변경] 참가자 11명 초과 등록 원천 차단
         window.addToParticipants = async function(id) {
             if (participatingPlayers.length >= 10) {
-                window.showToast('이미 참가자가 10명입니다.', 'warning');
+                window.showToast('더 이상 추가할 수 없습니다! 5:5 매칭은 최대 10명까지만 가능합니다.', 'error');
                 return;
             }
             await sb.from('players').update({ 
@@ -705,7 +722,6 @@
                 const finalTagLine  = playerInfo.tagLine  || tagLine;
 
                 // 3. 중복 행 "완전 삭제(병합)" 로직
-                // 기존에 동일한 라이엇 계정이 등록되어 있다면, 확인 후 이전 행을 삭제하고 현재 수동 행과 합칩니다.
                 const { data: dupRows, error: dupErr } = await sb.from('players')
                     .select('id, name, game_name, tag_line, puuid')
                     .or(`puuid.eq.${puuid},and(game_name.eq.${finalGameName},tag_line.eq.${finalTagLine})`);
@@ -722,14 +738,13 @@
                             window.showToast('연결을 취소했습니다.', 'warning');
                             return;
                         }
-                        // 합치기: 기존에 있던 중복 행을 완전히 삭제해버립니다.
                         for (const r of others) {
                             await sb.from('players').delete().eq('id', r.id);
                         }
                     }
                 }
 
-                // 4. 안전한 DB 업데이트 (현재 행에 라이엇 데이터 덮어쓰기)
+                // 4. 안전한 DB 업데이트
                 const updateData = {
                     puuid: puuid,
                     game_name: finalGameName,
@@ -968,6 +983,12 @@
         window.addSummonerToList = async function(autoParticipate = false) {
             if (!currentSummonerData) return window.showToast('검색된 소환사가 없습니다.', 'warning');
             
+            // [11명 제한] 추가하고 참가하기를 눌렀는데 이미 10명인 경우
+            if (autoParticipate && participatingPlayers.length >= 10) {
+                window.showToast('이미 참가자가 10명이어서 매칭에는 참여할 수 없습니다. (명단에만 추가됩니다)', 'error');
+                autoParticipate = false;
+            }
+
             const player = currentSummonerData;
             const calculatedMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
 
@@ -1002,7 +1023,7 @@
                 let updatedRow = (updateResult.data && updateResult.data[0]) || null;
                 if (updateResult.error) throw updateResult.error;
 
-                // 2차: 상단 검색을 통해 명단 추가를 눌렀는데, 이미 똑같은 이름을 가진 "수동 인원(puuid 없음)"이 있다면 자동으로 합칩니다.
+                // 2차: 상단 검색을 통해 명단 추가를 눌렀는데, 이미 똑같은 이름을 가진 "수동 인원"이 있다면 합칩니다.
                 if (!updatedRow && finalGameName) {
                     const { data: matched, error: matchErr } = await sb.from('players')
                         .select('id, name, puuid')
@@ -1021,7 +1042,7 @@
                     }
                 }
 
-                // 3차: 그래도 매칭되는 행이 없으면 새로운 데이터로 추가
+                // 3차: 매칭되는 행이 없으면 새로운 데이터로 추가
                 if (!updatedRow) {
                     const { data: insData, error: insErr } = await sb.from('players').insert({
                         puuid: player.puuid,
@@ -1062,6 +1083,7 @@
             }
         };
 
+        // [핵심 변경] 일괄 등록 시 11명 초과 방지
         window.bulkAddToMatch = async function() {
             const text = document.getElementById('bulkParticipants').value.trim();
             if (!text) return window.showToast('이름을 입력하세요.', 'warning');
@@ -1078,8 +1100,8 @@
             if (matched.length === 0) return window.showToast(`일치하는 선수 없음: ${missing.join(', ')}`, 'error');
             
             const available = 10 - participatingPlayers.length;
-            if (available <= 0) return window.showToast('이미 10명 참가 중', 'warning');
-            if (newParticipants.length > available) return window.showToast(`빈자리 ${available}개, 추가 필요 ${newParticipants.length}명`, 'warning');
+            if (available <= 0) return window.showToast('더 이상 추가할 수 없습니다! 매칭은 최대 10명까지만 가능합니다.', 'error');
+            if (newParticipants.length > available) return window.showToast(`빈자리가 ${available}개뿐입니다. ${newParticipants.length}명을 모두 추가할 수 없습니다.`, 'error');
             
             const msg = [`${newParticipants.length}명 참가 추가`, alreadyIn.length ? `이미 참가: ${alreadyIn.map(p=>p.name || p.game_name).join(', ')}` : '', missing.length ? `미등록: ${missing.join(', ')}` : ''].filter(Boolean).join('\n');
             if (!confirm(msg)) return;
@@ -1090,6 +1112,7 @@
             window.showToast(`${ids.length}명 참가자로 추가됨`, 'success');
         };
 
+        // ========== 가장 공평하게 5:5 밸런스를 맞추는 알고리즘 ==========
         window.makeTeams = async function() {
             if (participatingPlayers.length !== 10) return window.showToast('정확히 10명이어야 합니다.', 'warning');
             
@@ -1099,7 +1122,7 @@
 
             try {
                 const totalPlayers = participatingPlayers.length;
-                const targetSize = Math.floor(totalPlayers / 2);
+                const targetSize = Math.floor(totalPlayers / 2); // 무조건 5명
                 const totalScore = participatingPlayers.reduce((sum, p) => sum + p.mmr, 0);
 
                 const forcedA = participatingPlayers.filter(p => p.lock_team === 'A');
@@ -1115,13 +1138,18 @@
                 let bestDiff = Infinity;
                 let bestCombinations = [];
 
+                // 모든 경우의 수(최대 252개)를 계산하여 양 팀 점수 차이가 가장 작은 최적의 밸런스를 찾아냅니다.
                 function dfs(index, chosen, currentSum) {
                     if (chosen.length === needA) {
                         const sumA = forcedASum + currentSum;
                         const sumB = totalScore - sumA;
                         const diff = Math.abs(sumA - sumB);
-                        if (diff < bestDiff) { bestDiff = diff; bestCombinations = [[...forcedA, ...chosen]]; }
-                        else if (diff === bestDiff) bestCombinations.push([...forcedA, ...chosen]);
+                        if (diff < bestDiff) { 
+                            bestDiff = diff; 
+                            bestCombinations = [[...forcedA, ...chosen]]; 
+                        } else if (diff === bestDiff) {
+                            bestCombinations.push([...forcedA, ...chosen]);
+                        }
                         return;
                     }
                     if (index >= flexible.length) return;
@@ -1148,7 +1176,8 @@
                 await sb.from('players').update({ assigned_team: 'A' }).in('id', teamAIds);
                 await sb.from('players').update({ assigned_team: 'B' }).in('id', teamBIds);
                 
-                window.showToast(`팀 나누기 완료! (MMR 차이: ${bestDiff})`, 'success');
+                // [안내 메시지 강화]
+                window.showToast(`가장 공평한 매칭 완료! (팀 점수 차이: ${bestDiff}점)`, 'success');
             } catch (err) {
                 window.showToast(err.message, 'error');
             } finally {
