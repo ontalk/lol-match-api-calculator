@@ -204,7 +204,7 @@
     <div class="modal-overlay" id="editModal">
         <div class="modal">
             <h3>✏️ MMR 수동 수정</h3>
-            <p style="font-size: 12px; color: #f39c12; margin-bottom: 15px;">※ 점수를 수동으로 변경하면 <strong>자동으로 🔒고정(Lock) 모드로 전환</strong>되어 보호됩니다.</p>
+            <p style="font-size: 12px; color: #f39c12; margin-bottom: 15px;">※ 점수를 수정하면 DB 덮어쓰기 방지를 위해 <strong>자동으로 🔒고정(Lock)</strong> 모드가 됩니다.</p>
             <input type="hidden" id="editPlayerId">
             <input type="number" id="editMmrInput" placeholder="새 MMR 점수" min="0" max="3000">
             <div class="modal-actions">
@@ -246,7 +246,6 @@
                 finalMmr = baseScore + (divisionBonus[rankUpper] || 0);
             }
             
-            // 데이터베이스 정수 타입 충돌을 막기 위해 무조건 정수 처리
             return Math.round(finalMmr);
         }
 
@@ -302,6 +301,7 @@
               .subscribe();
         }
 
+        // 🔥 [완벽 픽스 1] DB 감시 회피 및 이전 버그 자동 치료 기능
         async function loadPlayers() {
             const { data, error } = await sb.from('players').select('*');
             if (error) { 
@@ -312,15 +312,24 @@
             
             let players = data || [];
             
-            // 🔥 [완벽 꼼수 핵심] DB의 자동계산 트리거를 무시하고, "패배 횟수가 음수(-1)"인 사람은 
-            // "승리 횟수(wins)"에 숨겨둔 수동 점수를 화면의 진짜 점수(mmr)로 바꿔치기 합니다!
             players.forEach(p => {
-                if (p.losses !== null && p.losses < 0) {
-                    p.mmr = p.wins;
+                // 1. [치료] 예전 버그로 인해 아이콘이 마이너스 값이 된 사람들을 찾아 강제 복구시킵니다.
+                if (p.profile_icon_id !== null && p.profile_icon_id < 0) {
+                    p.profile_icon_id = null; // UI 상에서 실루엣으로 복구 (이후 롤 연결/갱신 시 정상 아이콘 돌아옴)
+                    sb.from('players').update({ profile_icon_id: null }).eq('id', p.id); // 몰래 DB 수정
+                }
+
+                // 2. [DB 우회] 패배 횟수(losses)가 -10000 이하인 경우, 이는 제가 몰래 꼼수로 저장해둔 수동 점수입니다!
+                // DB가 원래 점수를 1200으로 멋대로 바꿨든 말든 우리는 이 숨겨둔 진짜 점수를 꺼내 씁니다.
+                if (p.losses !== null && p.losses <= -10000) {
+                    p.mmr = Math.abs(p.losses) - 10000;
+                    p.is_locked = true; // 고정된 상태임을 UI에 알림
+                } else {
+                    p.is_locked = false;
                 }
             });
 
-            // 점수순 정렬
+            // 진짜 점수 기준으로 내림차순 정렬
             players.sort((a, b) => b.mmr - a.mmr);
             
             allPlayersCache = players;
@@ -350,7 +359,7 @@
                             ${p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : ''}
                             <div style="display: flex; align-items: center; gap: 5px;">
                                 ${p.tier && p.tier !== 'UNRANKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                                ${p.losses < 0 ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
+                                ${p.is_locked ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -362,7 +371,7 @@
                             <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀</option>
                         </select>
                         <button class="btn-icon btn-add-participant" onclick="window.addToParticipants('${p.id}')" title="참가자 추가">➕</button>
-                        <button class="btn-icon ${p.losses < 0 ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.losses || 0}, ${p.mmr})" title="점수 고정 켜기/끄기">${p.losses < 0 ? '🔒' : '🔓'}</button>
+                        <button class="btn-icon ${p.is_locked ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.is_locked}, ${p.mmr})" title="점수 고정 켜기/끄기">${p.is_locked ? '🔒' : '🔓'}</button>
                         <button class="btn-icon btn-edit" onclick="window.editPlayer('${p.id}', '${p.mmr}')" title="점수 수정">✏️</button>
                         <button class="btn-icon btn-delete" onclick="window.deletePlayer('${p.id}')" title="삭제">🗑️</button>
                     </div>
@@ -397,7 +406,7 @@
                             ${p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : ''}
                             <div style="display: flex; align-items: center; gap: 5px;">
                                 ${p.tier && p.tier !== 'UNRANKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                                ${p.losses < 0 ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
+                                ${p.is_locked ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -408,7 +417,7 @@
                             <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>A팀</option>
                             <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀</option>
                         </select>
-                        <button class="btn-icon ${p.losses < 0 ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.losses || 0}, ${p.mmr})" title="점수 고정 켜기/끄기">${p.losses < 0 ? '🔒' : '🔓'}</button>
+                        <button class="btn-icon ${p.is_locked ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.is_locked}, ${p.mmr})" title="점수 고정 켜기/끄기">${p.is_locked ? '🔒' : '🔓'}</button>
                         <button class="btn-icon btn-edit" onclick="window.editPlayer('${p.id}', '${p.mmr}')" title="점수 수정">✏️</button>
                         <button class="btn-icon btn-delete" onclick="window.removeFromMatch('${p.id}')" title="명단으로 내리기">✖</button>
                     </div>
@@ -444,7 +453,7 @@
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 ${p.tier && p.tier !== 'UNRANKED' ? `<span class="team-player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                                ${p.losses < 0 ? `<span class="team-player-rank" style="color:#f39c12; background:rgba(243,156,18,0.15);">🔒</span>` : ''}
+                                ${p.is_locked ? `<span class="team-player-rank" style="color:#f39c12; background:rgba(243,156,18,0.15);">🔒</span>` : ''}
                             </div>
                         </div>
                         <div class="team-player-mmr">${p.mmr}</div>
@@ -498,11 +507,11 @@
             const mmr = parseInt(document.getElementById('playerMmr').value) || 1200;
             if (!name) return window.showToast('이름을 입력하세요.', 'warning');
             
-            // 수동 유저는 자동으로 잠금(-1) & 수동 점수(wins)로 등록
+            // 수동 추가 시 DB 감시를 피하기 위해 패배 횟수에 마이너스 값으로 몰래 숨겨서 저장합니다.
+            const lockValue = -(mmr + 10000); 
             const { error } = await sb.from('players').insert({ 
                 name: name,
-                wins: mmr,
-                losses: -1
+                losses: lockValue
             });
             if (error) { console.error(error); window.showToast('추가 실패: ' + error.message, 'error'); return; }
             
@@ -522,7 +531,8 @@
                 const mmr = parseInt(parts.pop()) || 1200;
                 const name = parts.join(' ');
                 if (name) {
-                    players.push({ name: name, wins: mmr, losses: -1 });
+                    const lockValue = -(mmr + 10000);
+                    players.push({ name: name, losses: lockValue });
                 }
             }
             if (players.length === 0) return window.showToast('올바른 데이터가 없습니다.', 'warning');
@@ -538,16 +548,17 @@
             await sb.from('players').update({ lock_team: team }).eq('id', id);
         };
         
-        // 🔥 [완벽 꼼수 핵심] 🔒 락 토글 기능
-        window.toggleMmrLock = async function(id, currentLosses, currentMmr) {
-            if (currentLosses < 0) {
-                // 고정 해제 -> losses를 0으로 돌려놓아 DB 트리거의 진짜 mmr를 다시 사용하게 함 (티어/아이콘 그대로!)
+        // 🔥 [완벽 픽스 2] 점수 고정 토글
+        window.toggleMmrLock = async function(id, isLocked, currentMmr) {
+            if (isLocked) {
+                // 고정 해제 -> losses를 0으로 돌려놓으면, DB의 원래 점수(mmr)가 다시 적용됩니다.
                 const { error } = await sb.from('players').update({ losses: 0 }).eq('id', id);
-                if (!error) window.showToast('🔓 점수 고정이 해제되었습니다. (티어 갱신 시 다시 라이엇 점수가 적용됩니다)', 'success');
+                if (!error) window.showToast('🔓 점수 고정이 해제되었습니다. (다음 갱신 때 라이엇 점수가 덮어씌워집니다)', 'success');
             } else {
-                // 고정 걸기 -> losses를 -1로 만들고, 현재 mmr을 wins에 숨겨놓음 (티어/아이콘 그대로!)
-                const { error } = await sb.from('players').update({ wins: currentMmr, losses: -1 }).eq('id', id);
-                if (!error) window.showToast('🔒 점수가 고정되었습니다. (티어를 갱신해도 보호됩니다)', 'success');
+                // 고정 걸기 -> 현재 점수를 losses에 마이너스로 숨깁니다.
+                const lockValue = -(currentMmr + 10000);
+                const { error } = await sb.from('players').update({ losses: lockValue }).eq('id', id);
+                if (!error) window.showToast('🔒 점수가 고정되었습니다. (DB가 멋대로 1200점으로 못 바꿉니다!)', 'success');
             }
             loadPlayers(); // 즉시 화면 갱신
         };
@@ -589,16 +600,17 @@
             document.getElementById('editModal').classList.remove('active');
         };
 
-        // 🔥 [완벽 꼼수 핵심] 수동 점수 저장 시
+        // 🔥 [완벽 픽스 3] 수동 점수 저장 (DB 덮어쓰기 완전 방어)
         window.saveMmr = async function() {
             const id = document.getElementById('editPlayerId').value;
             const mmr = parseInt(document.getElementById('editMmrInput').value);
             if (isNaN(mmr)) return window.showToast('올바른 숫자를 입력하세요.', 'warning');
             
-            // DB의 트리거를 피해 수동 점수를 wins에, 잠금 상태를 losses: -1 에 저장합니다.
+            const lockValue = -(mmr + 10000); // 10을 입력하면 -10010으로 암호화
+            
+            // DB 감시망을 피하기 위해 mmr 대신 losses 칸에만 저장합니다.
             const { error } = await sb.from('players').update({ 
-                wins: mmr,
-                losses: -1 
+                losses: lockValue 
             }).eq('id', id);
             
             if(error) {
@@ -612,12 +624,12 @@
 
         // ========== 전체 명단 티어 일괄 갱신 ==========
         window.syncAllTiers = async function() {
-            // [방어막 적용] losses가 0 미만(즉 -1)인 사람은 고정(🔒)된 사람이므로 갱신 대상에서 원천 제외!
-            const playersToSync = allPlayersCache.filter(p => p.puuid && !(p.losses < 0));
-            const lockedCount = allPlayersCache.filter(p => p.puuid && p.losses < 0).length;
+            // [방어막 적용] 고정(🔒) 상태인 사람(losses <= -10000)은 갱신 대상에서 원천 제외시킵니다!
+            const playersToSync = allPlayersCache.filter(p => p.puuid && !p.is_locked);
+            const lockedCount = allPlayersCache.filter(p => p.puuid && p.is_locked).length;
 
             if (playersToSync.length === 0) {
-                if (lockedCount > 0) return window.showToast(`현재 명단의 라이엇 계정은 모두 고정(🔒)되어 있어 갱신할 내용이 없습니다.`, 'warning');
+                if (lockedCount > 0) return window.showToast(`명단의 라이엇 계정들이 모두 고정(🔒)되어 있어 갱신이 필요 없습니다.`, 'warning');
                 return window.showToast('갱신할 라이엇 계정이 명단에 없습니다.', 'warning');
             }
             
@@ -762,7 +774,7 @@
                     profile_icon_id: playerInfo.profileIconId || null, summoner_level: playerInfo.summonerLevel || null,
                     tier: tier, rank: rank, league_points: leaguePoints, 
                     wins: wins, 
-                    losses: losses, // 실제 라이엇 패배 횟수로 덮어씌워지면서 자동으로 잠금(Lock) 해제됨!
+                    losses: losses, // 실제 라이엇 패배 횟수(정상값)로 덮어씌워지므로 고정(Lock) 모드가 해제됨
                     mmr: calculatedMMR, last_rank_update: new Date().toISOString()
                 };
 
