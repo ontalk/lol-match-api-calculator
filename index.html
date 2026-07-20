@@ -459,7 +459,7 @@
                             <span class="riot-link-label">🔗 라이엇 연결:</span>
                             <input type="text" class="riot-gn" data-player-id="${p.id}" placeholder="게임명 (예: Hide on bush)" autocomplete="off">
                             <input type="text" class="riot-tl" data-player-id="${p.id}" placeholder="KR1" maxlength="5">
-                            <button onclick="window.linkRiotAccount('${p.id}')" id="linkBtn-${p.id}">계정 연결</button>
+                            <button onclick="window.handleLinkClick('${p.id}')" id="linkBtn-${p.id}">계정 연결</button>
                         </div>
                     ` : ''}
                 </li>
@@ -643,27 +643,37 @@
             window.showToast('MMR 수정됨', 'success');
         };
 
-        // ========== 라이엇 계정 연결 (인라인, 409 안전 처리) ==========
+        // ========== 라이엇 계정 연결 (수동 유저 전용, 안전한 UPDATE) ==========
         /**
-         * 수동 등록된 플레이어의 Riot 계정을 연결.
+         * [버그 1 수정] 수동 등록된 플레이어의 Riot 계정을 연결.
+         * - 시그니처: linkRiotAccount(playerId, gameName, tagLine)
          * - /api/riot/summoner 로 puuid 획득
          * - /api/riot/rank 로 솔로랭크 데이터 추출
          * - calculateMMRFromTier 로 MMR 계산
-         * - sb.update().eq('id', playerId) 로 안전 업데이트 (INSERT/UPSERT 금지)
-         * - 409(23505) 에러 발생 시 친절한 토스트 처리
+         * - [가장 중요] addSummonerToList 절대 호출 금지.
+         *   오직 sb.from('players').update({...}).eq('id', playerId) 로 덮어쓰기(UPDATE)만 수행.
+         * - [409 에러 방지] update 실행 후 반환된 error를 체크하여,
+         *   에러 코드가 '23505'이거나 409 충돌 에러면
+         *   window.showToast('이미 명단에 존재하는 롤 계정입니다.', 'error'); 후 함수 즉시 종료(return).
+         * - 성공하면 loadPlayers() 호출해 화면 갱신.
          */
-        window.linkRiotAccount = async function(playerId) {
+        window.linkRiotAccount = async function(playerId, gameName, tagLine) {
             // 중복 요청 방지
             if (linkingInProgress.has(playerId)) return;
             linkingInProgress.add(playerId);
 
-            // 인라인 입력값 읽기
-            const gnInput = document.querySelector(`input.riot-gn[data-player-id="${playerId}"]`);
-            const tlInput = document.querySelector(`input.riot-tl[data-player-id="${playerId}"]`);
+            // 인자가 없으면 인라인 입력에서 폴백 읽기 (하위 호환)
+            if (!gameName || !tagLine) {
+                const gnInput = document.querySelector(`input.riot-gn[data-player-id="${playerId}"]`);
+                const tlInput = document.querySelector(`input.riot-tl[data-player-id="${playerId}"]`);
+                gameName = gnInput ? gnInput.value.trim() : '';
+                tagLine = tlInput ? tlInput.value.trim().toUpperCase() : '';
+            } else {
+                gameName = String(gameName).trim();
+                tagLine = String(tagLine).trim().toUpperCase();
+            }
+
             const btn = document.getElementById(`linkBtn-${playerId}`);
-            
-            const gameName = gnInput ? gnInput.value.trim() : '';
-            const tagLine = tlInput ? tlInput.value.trim().toUpperCase() : '';
             
             if (!gameName || !tagLine) {
                 linkingInProgress.delete(playerId);
@@ -674,7 +684,7 @@
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading"></span>연동 중...'; }
 
             try {
-                // 1. 소환사 검색 → puuid
+                // 1. 소환사 검색 → puuid, 프로필 정보
                 const summResp = await fetch('/api/riot/summoner', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -717,10 +727,12 @@
                     console.warn('랭크 조회 실패 (언랭 처리):', err);
                 }
 
-                // 3. MMR 계산
+                // 3. MMR 계산 (반드시 DB 입력 전 실행)
                 const calculatedMMR = calculateMMRFromTier(tier, rank, leaguePoints);
 
                 // 4. 안전한 DB 업데이트 (UPDATE only, id 기준)
+                //    절대 addSummonerToList 호출 금지.
+                //    오직 update().eq('id', playerId)만 사용.
                 const updateData = {
                     puuid: puuid,
                     game_name: playerInfo.gameName || gameName,
@@ -738,10 +750,11 @@
 
                 const { error } = await sb.from('players').update(updateData).eq('id', playerId);
                 
+                // [409 에러 방지] update 실행 후 반환된 error 체크
                 if (error) {
-                    // 409 Conflict / Postgres 23505 unique violation 처리
-                    if (error.code === '23505' || error.message.includes('23505') || error.message.includes('duplicate') || error.message.includes('unique')) {
-                        return window.showToast('이미 다른 사람에게 연결된 라이엇 계정입니다.', 'error');
+                    if (error.code === '23505' || error.status === 409 || error.message.includes('23505') || error.message.includes('duplicate') || error.message.includes('unique') || error.message.includes('conflict')) {
+                        window.showToast('이미 명단에 존재하는 롤 계정입니다.', 'error');
+                        return; // 앱이 터지지 않도록 즉시 종료
                     }
                     throw new Error('DB 업데이트 실패: ' + error.message);
                 }
@@ -753,7 +766,6 @@
             } catch (err) {
                 console.error('라이엇 연동 에러:', err);
                 const msg = err.message || '알 수 없는 오류';
-                // 404 계열 명확 안내
                 if (msg.includes('404') || msg.includes('찾을 수 없') || msg.includes('Not Found')) {
                     window.showToast('해당 닉네임/태그의 소환사를 찾을 수 없습니다.', 'error');
                 } else {
@@ -765,7 +777,23 @@
             }
         };
 
+        // 인라인 입력값을 읽어 linkRiotAccount 에 전달하는 래퍼
+        window.handleLinkClick = function(playerId) {
+            const gnInput = document.querySelector(`input.riot-gn[data-player-id="${playerId}"]`);
+            const tlInput = document.querySelector(`input.riot-tl[data-player-id="${playerId}"]`);
+            const gameName = gnInput ? gnInput.value.trim() : '';
+            const tagLine = tlInput ? tlInput.value.trim() : '';
+            window.linkRiotAccount(playerId, gameName, tagLine);
+        };
+
         // ========== Riot API 연동 (검색 섹션) ==========
+        /**
+         * [버그 2 수정] searchSummoner
+         * - 라이엇 API 데이터를 받아왔을 때, DB에 넣기 전 반드시
+         *   const calculatedMMR = calculateMMRFromTier(tier, rank, leaguePoints); 실행.
+         * - DB update 할 때 이 calculatedMMR 값이 mmr 컬럼에 정확하게 들어가도록 복구.
+         * - 기본값 1200이 들어가면 안 됨.
+         */
         async function searchSummoner() {
             const gameName = document.getElementById('gameName').value.trim();
             const tagLine = document.getElementById('tagLine').value.trim().toUpperCase();
@@ -812,21 +840,33 @@
                                 currentSummonerData.leaguePoints = soloRank.leaguePoints;
                                 currentSummonerData.wins = soloRank.wins;
                                 currentSummonerData.losses = soloRank.losses;
-                                
-                                const calculatedMMR = calculateMMRFromTier(soloRank.tier, soloRank.rank, soloRank.leaguePoints);
-                                currentSummonerData.mmr = calculatedMMR;
-                                
-                                await sb.from('players').update({
-                                    tier: soloRank.tier,
-                                    rank: soloRank.rank,
-                                    league_points: soloRank.leaguePoints,
-                                    wins: soloRank.wins,
-                                    losses: soloRank.losses,
-                                    mmr: calculatedMMR
-                                }).eq('puuid', targetPuuid);
-                                
-                                loadPlayers();
+                            } else {
+                                // 랭크 데이터가 없으면 언랭 처리
+                                currentSummonerData.tier = 'UNRANKED';
+                                currentSummonerData.rank = 'IV';
+                                currentSummonerData.leaguePoints = 0;
+                                currentSummonerData.wins = 0;
+                                currentSummonerData.losses = 0;
                             }
+
+                            // [버그 2 수정] DB에 넣기 전 반드시 MMR 계산
+                            const calculatedMMR = calculateMMRFromTier(
+                                currentSummonerData.tier,
+                                currentSummonerData.rank,
+                                currentSummonerData.leaguePoints
+                            );
+                            currentSummonerData.mmr = calculatedMMR;
+                            
+                            await sb.from('players').update({
+                                tier: currentSummonerData.tier,
+                                rank: currentSummonerData.rank,
+                                league_points: currentSummonerData.leaguePoints,
+                                wins: currentSummonerData.wins,
+                                losses: currentSummonerData.losses,
+                                mmr: calculatedMMR
+                            }).eq('puuid', targetPuuid);
+                            
+                            loadPlayers();
                         }
                     } catch (err) {
                         console.warn('티어 갱신 튕김:', err);
@@ -855,12 +895,13 @@
             const mmrValue = document.getElementById('mmrValue');
             const rankDetail = document.getElementById('rankDetail');
             
+            // 항상 calculateMMRFromTier 로 미리보기 MMR 계산 (1200 기본값 사용 금지)
+            const previewMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
+            mmrValue.textContent = previewMMR;
+            
             if (player.tier && player.tier !== 'UNRANKED') {
                 tierBadge.className = `tier-badge ${player.tier.toLowerCase()}`;
                 tierBadge.textContent = formatTier(player.tier) + (player.rank ? ` ${player.rank}` : '');
-                
-                const previewMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
-                mmrValue.textContent = previewMMR;
                 
                 rankDetail.innerHTML = `
                     <span>${player.leaguePoints || 0} LP</span>
@@ -869,8 +910,7 @@
             } else {
                 tierBadge.className = 'tier-badge unranked';
                 tierBadge.textContent = 'Unranked';
-                mmrValue.textContent = 1200;
-                rankDetail.innerHTML = '<span>배치 미완료 (기본 1200점)</span>';
+                rankDetail.innerHTML = '<span>배치 미완료 (계산된 MMR: ' + previewMMR + '점)</span>';
             }
             
             document.getElementById('summonerResult').classList.remove('hidden');
@@ -931,13 +971,21 @@
             }
         };
 
+        /**
+         * [버그 2 수정] addSummonerToList
+         * - 라이엇 API 데이터를 받아왔을 때, DB에 넣기 전 반드시
+         *   const calculatedMMR = calculateMMRFromTier(tier, rank, leaguePoints); 실행.
+         * - DB upsert/update/insert 할 때 이 calculatedMMR 값이 mmr 컬럼에 정확하게 들어가도록 복구.
+         * - 기본값 1200이 들어가면 안 됨.
+         */
         window.addSummonerToList = async function(autoParticipate = false) {
             if (!currentSummonerData) return window.showToast('검색된 소환사가 없습니다.', 'warning');
             
             const player = currentSummonerData;
+            // [버그 2 수정] DB에 넣기 전 반드시 MMR 계산
             const calculatedMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
             
-            // upsert 대신 안전한 update (이미 puuid 존재하는 경우)
+            // 1차 시도: 이미 puuid 가 존재하면 안전한 update
             const { error } = await sb.from('players').update({
                 tier: player.tier,
                 rank: player.rank,
@@ -951,9 +999,8 @@
             
             if (error) {
                 console.error(error);
-                // puuid가 아직 없는 신규 등록이라면 INSERT 시도
+                // puuid가 아직 없는 신규 등록(0 rows affected)이라면 INSERT 시도
                 if (error.code === 'PGRST116' || error.message.includes('0 rows')) {
-                    // 새 행 INSERT
                     const { error: insErr } = await sb.from('players').insert({
                         puuid: player.puuid,
                         game_name: player.gameName,
@@ -968,7 +1015,7 @@
                         losses: player.losses,
                         mmr: calculatedMMR,
                         is_participating: autoParticipate,
-                        lock_team: autoParticipate ? 'none' : 'none'
+                        lock_team: 'none'
                     });
                     if (insErr) {
                         if (insErr.code === '23505') {
