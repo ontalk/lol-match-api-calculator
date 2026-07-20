@@ -14,7 +14,6 @@
         .card { background: #16213e; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #0f3460; }
         .card h2 { margin-top: 0; color: #e94560; border-bottom: 1px solid #0f3460; padding-bottom: 10px; }
         
-        .search-section { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
         .input-group { flex: 1; min-width: 180px; }
         .input-group label { display: block; margin-bottom: 5px; font-size: 14px; color: #aaa; }
         .input-group input, .input-group select { width: 100%; padding: 12px; border: 1px solid #0f3460; background: #0f0f23; color: #eee; border-radius: 8px; font-size: 16px; }
@@ -25,45 +24,9 @@
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .btn-secondary { background: #0f3460; color: #fff; }
         .btn-secondary:hover { background: #1a4a7a; }
-        .btn-success { background: linear-gradient(135deg, #2ecc71, #27ae60); color: white; }
         .btn-warning { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; }
         .btn-danger { background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; }
         
-        .summoner-result { display: none; background: linear-gradient(135deg, #1a1a3a 0%, #2d1b4e 100%); border: 1px solid #e94560; border-radius: 12px; padding: 20px; margin-top: 15px; animation: slideIn 0.3s ease; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .summoner-header { display: flex; align-items: center; gap: 20px; margin-bottom: 15px; }
-        .summoner-icon { width: 80px; height: 80px; border-radius: 12px; background: #0f0f23; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .summoner-icon img { width: 100%; height: 100%; object-fit: cover; }
-        .summoner-info { flex: 1; }
-        .summoner-name { font-size: 24px; font-weight: 700; color: #fff; margin: 0; }
-        .summoner-tag { font-size: 14px; color: #aaa; margin: 5px 0 0; }
-        .summoner-level { font-size: 14px; color: #f0c808; margin: 5px 0 0; }
-        
-        .rank-display { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-        .tier-badge { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; font-weight: 700; font-size: 14px; text-transform: uppercase; }
-        .tier-badge.unranked { background: #333; color: #888; }
-        .tier-badge.iron { background: linear-gradient(135deg, #7d6b5e, #5a4a3e); color: #fff; }
-        .tier-badge.bronze { background: linear-gradient(135deg, #cd7f32, #a0522d); color: #fff; }
-        .tier-badge.silver { background: linear-gradient(135deg, #c0c0c0, #8a8a8a); color: #000; }
-        .tier-badge.gold { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; }
-        .tier-badge.platinum { background: linear-gradient(135deg, #00e5e5, #009999); color: #000; }
-        .tier-badge.emerald { background: linear-gradient(135deg, #50c878, #2e8b57); color: #fff; }
-        .tier-badge.diamond { background: linear-gradient(135deg, #b9f2ff, #00bfff); color: #000; }
-        .tier-badge.master { background: linear-gradient(135deg, #9932cc, #8a2be2); color: #fff; }
-        .tier-badge.grandmaster { background: linear-gradient(135deg, #ff69b4, #ff1493); color: #fff; }
-        .tier-badge.challenger { background: linear-gradient(135deg, #ff4500, #ff8c00); color: #fff; }
-        
-        .mmr-display { background: rgba(233,69,96,0.2); border: 1px solid #e94560; padding: 10px 20px; border-radius: 10px; text-align: center; min-width: 120px; }
-        .mmr-label { font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
-        .mmr-value { font-size: 28px; font-weight: 800; color: #f0c808; line-height: 1; }
-        
-        .rank-detail { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px; font-size: 14px; color: #ccc; }
-        .rank-detail span { background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 6px; }
-        .result-actions { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
-        
-        .participants-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        @media (max-width: 768px) { .participants-section { grid-template-columns: 1fr; } }
-        .list-container { min-height: 300px; }
         .player-list { list-style: none; padding: 0; margin: 0; }
         .player-item { display: flex; align-items: center; justify-content: space-between; background: #0f0f23; border: 1px solid #0f3460; border-radius: 8px; padding: 12px; margin-bottom: 8px; transition: all 0.2s; }
         .player-item:hover { border-color: #e94560; transform: translateX(4px); }
@@ -152,18 +115,34 @@
         
         .hidden { display: none !important; }
         .muted { color: #888; font-size: 13px; }
-        .section-row { display: flex; gap: 20px; flex-wrap: wrap; }
-        .section-row > .card { flex: 1; min-width: 300px; }
         
-        .player-list-container { max-height: 400px; overflow-y: auto; padding-right: 8px; }
-        .player-list-container::-webkit-scrollbar { width: 6px; }
-        .player-list-container::-webkit-scrollbar-track { background: #0f0f23; border-radius: 3px; }
-        .player-list-container::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+        /* 레이아웃 동기화 최적화 */
+        .section-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; }
+        .section-row > .card { flex: 1; min-width: 300px; display: flex; flex-direction: column; }
         
-        .participant-list-container { max-height: 300px; overflow-y: auto; padding-right: 8px; }
-        .participant-list-container::-webkit-scrollbar { width: 6px; }
-        .participant-list-container::-webkit-scrollbar-track { background: #0f0f23; border-radius: 3px; }
-        .participant-list-container::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+        /* 스크롤 영역 대폭 상향 및 플렉스 적용 */
+        .player-list-container, .participant-list-container {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 450px; /* 기본 높이 상향 */
+            max-height: 700px; /* 최대 높이 상향 */
+            padding-right: 8px;
+        }
+        .player-list-container::-webkit-scrollbar, .participant-list-container::-webkit-scrollbar { width: 6px; }
+        .player-list-container::-webkit-scrollbar-track, .participant-list-container::-webkit-scrollbar-track { background: #0f0f23; border-radius: 3px; }
+        .player-list-container::-webkit-scrollbar-thumb, .participant-list-container::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+        
+        /* 티어 뱃지 색상 */
+        .tier-iron { color: #7d6b5e; }
+        .tier-bronze { color: #cd7f32; }
+        .tier-silver { color: #c0c0c0; }
+        .tier-gold { color: #ffd700; }
+        .tier-platinum { color: #00e5e5; }
+        .tier-emerald { color: #50c878; }
+        .tier-diamond { color: #00bfff; }
+        .tier-master { color: #9932cc; }
+        .tier-grandmaster { color: #ff69b4; }
+        .tier-challenger { color: #ff4500; }
     </style>
 </head>
 <body>
@@ -180,57 +159,9 @@
             </div>
         </div>
 
-        <div class="card">
-            <h2>🔍 소환사 검색 및 등록 (Riot API 연동)</h2>
-            <div class="search-section">
-                <div class="input-group">
-                    <label>게임명 (Game Name)</label>
-                    <input type="text" id="gameName" placeholder="예: Hide on bush" autocomplete="off">
-                </div>
-                <div class="input-group">
-                    <label>태그 (Tag Line)</label>
-                    <input type="text" id="tagLine" placeholder="예: KR1" maxlength="5" style="text-transform: uppercase;">
-                </div>
-                <button class="btn btn-primary" id="searchBtn" onclick="searchSummoner()">
-                    <span class="btn-text">검색 후 등록</span>
-                </button>
-            </div>
-            
-            <div class="summoner-result hidden" id="summonerResult">
-                <div class="summoner-header">
-                    <div class="summoner-icon">
-                        <img id="profileIcon" src="" alt="프로필 아이콘" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/0.png'">
-                    </div>
-                    <div class="summoner-info">
-                        <h3 class="summoner-name" id="resultName"></h3>
-                        <div class="summoner-tag" id="resultTag"></div>
-                        <div class="summoner-level" id="resultLevel"></div>
-                    </div>
-                    <div class="rank-display">
-                        <div class="tier-badge unranked" id="tierBadge">Unranked</div>
-                        <div class="mmr-display">
-                            <div class="mmr-label">추정 MMR</div>
-                            <div class="mmr-value" id="mmrValue">-</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="rank-detail" id="rankDetail"></div>
-                <div class="result-actions">
-                    <button class="btn btn-success" id="addToListBtn" onclick="addSummonerToList()">
-                        ✅ 명단에 추가
-                    </button>
-                    <button class="btn btn-primary" id="addAndMatchBtn" onclick="addSummonerToList(true)">
-                        ➕ 추가하고 매칭 참가
-                    </button>
-                    <button class="btn btn-secondary" onclick="fetchRankForSummoner()">
-                        🔄 티어 새로고침
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <div class="section-row">
-            <div class="card" style="flex: 1; min-width: 400px;">
+            <!-- 1. 전체 명단 카드 -->
+            <div class="card">
                 <h2>👥 전체 명단 및 참가자 관리</h2>
                 <div class="input-section">
                     <div class="input-row">
@@ -244,34 +175,39 @@
                     <textarea id="bulkData" placeholder="플레이어1 1200&#10;플레이어2 1450"></textarea>
                     <button class="btn btn-secondary" onclick="bulkAddPlayers()">일괄 등록</button>
                 </details>
-                <div style="margin-top: 15px;">
-                    <h4 style="color: #aaa; margin: 0 0 10px;">전체 명단 (드롭다운으로 팀 고정, ➕로 참가자 추가)</h4>
+                
+                <div style="margin-top: 15px; display: flex; flex-direction: column; flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 style="color: #aaa; margin: 0;">전체 명단 (➕로 참가자 추가)</h4>
+                        <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="syncAllTiers()">🔄 전체 티어 갱신</button>
+                    </div>
                     <div class="player-list-container" id="playerListContainer">
                         <ul class="player-list" id="playerList"></ul>
                     </div>
                 </div>
             </div>
 
-            <div class="card" style="flex: 1; min-width: 400px;">
+            <!-- 2. 매칭 참가자 카드 -->
+            <div class="card">
                 <h2>⚔️ 매칭 참가자 (최대 10명)</h2>
                 <details style="margin-bottom: 15px;">
                     <summary style="cursor: pointer; color: #aaa;">📋 이름으로 일괄 참가 추가</summary>
                     <textarea id="bulkParticipants" placeholder="플레이어1, 플레이어2"></textarea>
                     <button class="btn btn-secondary" onclick="bulkAddToMatch()">참가자로 추가</button>
                 </details>
-                <div class="participants-section">
-                    <div class="list-container">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h4 style="color: #e94560; margin: 0;">🔴 A팀 고정 / 🔵 B팀 고정 / ⚪ 미정</h4>
-                            <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="clearAllParticipants()">🗑️ 전체 빼기</button>
-                        </div>
-                        <div class="participant-list-container" id="participantListContainer">
-                            <ul class="player-list" id="participantList"></ul>
-                        </div>
+                
+                <div style="display: flex; flex-direction: column; flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 style="color: #e94560; margin: 0; font-size: 14px;">🔴 A팀 고정 / 🔵 B팀 고정 / ⚪ 미정</h4>
+                        <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="clearAllParticipants()">🗑️ 전체 빼기</button>
+                    </div>
+                    <div class="participant-list-container" id="participantListContainer">
+                        <ul class="player-list" id="participantList"></ul>
                     </div>
                 </div>
+                
                 <div style="margin-top: 20px; text-align: center;">
-                    <button class="btn btn-warning" style="padding: 15px 40px; font-size: 18px;" id="makeTeamsBtn" onclick="makeTeams()" disabled>
+                    <button class="btn btn-warning" style="padding: 15px 40px; font-size: 18px; width: 100%;" id="makeTeamsBtn" onclick="makeTeams()" disabled>
                         ⚖️ 공평하게 5:5 팀 나누기
                     </button>
                     <p id="makeTeamsMsg" class="muted" style="margin-top: 8px; font-weight: 600;">참가자 10명일 때 활성화됩니다</p>
@@ -318,7 +254,6 @@
         let sb = null; 
         let allPlayersCache = [];
         let participatingPlayers = [];
-        let currentSummonerData = null; 
         let linkingInProgress = new Set(); 
 
         // ========== 티어/랭크 기반 MMR 계산 함수 ==========
@@ -630,7 +565,6 @@
             }).eq('id', id);
         };
 
-        // [핵심 추가] 전체 빼기 버튼 기능
         window.clearAllParticipants = async function() {
             if (participatingPlayers.length === 0) {
                 return window.showToast('명단에 참가자가 없습니다.', 'warning');
@@ -652,7 +586,6 @@
             await sb.from('players').delete().eq('id', id);
         };
 
-        // [핵심 추가] 점수 수동 편집 
         window.editPlayer = function(id, currentMmr) {
             document.getElementById('editPlayerId').value = id;
             document.getElementById('editMmrInput').value = currentMmr;
@@ -668,8 +601,6 @@
             const mmr = parseInt(document.getElementById('editMmrInput').value);
             if (isNaN(mmr)) return window.showToast('올바른 숫자를 입력하세요.', 'warning');
             
-            // 데이터베이스 트리거가 티어를 보고 점수를 다시 원상복구 시키는 것을 막기 위해,
-            // 수동으로 점수를 조작하면 티어를 UNRANKED로 바꿔서 고정시킵니다.
             const { error } = await sb.from('players').update({ mmr: mmr, tier: 'UNRANKED' }).eq('id', id);
             if(error) {
                 window.showToast('수정 실패: ' + error.message, 'error');
@@ -677,6 +608,71 @@
                 window.closeModal();
                 window.showToast('MMR 수동 변경 완료 (티어 표시는 숨겨집니다)', 'success');
             }
+        };
+
+        // ========== 전체 명단 티어 일괄 갱신 ==========
+        window.syncAllTiers = async function() {
+            const playersToSync = allPlayersCache.filter(p => p.puuid);
+            if (playersToSync.length === 0) {
+                return window.showToast('갱신할 라이엇 계정이 명단에 없습니다.', 'warning');
+            }
+            if (!confirm(`명단에 등록된 ${playersToSync.length}명의 라이엇 계정 점수를 최신화하시겠습니까?\n(시간이 약간 소요될 수 있습니다)`)) return;
+
+            window.showToast(`${playersToSync.length}명 티어 갱신 시작...`, 'info');
+            
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const player of playersToSync) {
+                try {
+                    const rankResp = await fetch('/api/riot/rank', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ puuid: player.puuid })
+                    });
+                    const rankData = await rankResp.json();
+                    
+                    if (rankResp.ok) {
+                        const rawRank = rankData.rank || rankData;
+                        let soloRank = null;
+                        if (Array.isArray(rawRank)) {
+                            soloRank = rawRank.find(r => r.queueType === 'RANKED_SOLO_5x5');
+                            if (!soloRank && rawRank.length > 0) soloRank = rawRank[0];
+                        } else {
+                            soloRank = rawRank;
+                        }
+
+                        let tier = 'UNRANKED', rank = 'IV', leaguePoints = 0, wins = 0, losses = 0;
+                        if (soloRank && soloRank.tier) {
+                            tier = soloRank.tier;
+                            rank = soloRank.rank || 'IV';
+                            leaguePoints = soloRank.leaguePoints || 0;
+                            wins = soloRank.wins || 0;
+                            losses = soloRank.losses || 0;
+                        }
+
+                        const calculatedMMR = calculateMMRFromTier(tier, rank, leaguePoints);
+
+                        await sb.from('players').update({
+                            tier: tier,
+                            rank: rank,
+                            league_points: leaguePoints,
+                            wins: wins,
+                            losses: losses,
+                            mmr: calculatedMMR,
+                            last_rank_update: new Date().toISOString()
+                        }).eq('id', player.id);
+                        
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch(err) {
+                    failCount++;
+                }
+            }
+            window.showToast(`갱신 완료! (성공: ${successCount}명, 실패: ${failCount}명)`, 'success');
+            loadPlayers();
         };
 
         // ========== 라이엇 계정 연결 (수동 유저 전용) ==========
@@ -704,7 +700,6 @@
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading"></span>연동 중...'; }
 
             try {
-                // 1. 소환사 검색
                 const summResp = await fetch('/api/riot/summoner', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -717,7 +712,6 @@
                 const puuid = playerInfo.puuid;
                 if (!puuid) throw new Error('puuid를 가져오지 못했습니다.');
 
-                // 2. 랭크 정보 조회
                 let tier = 'UNRANKED', rank = 'IV', leaguePoints = 0, wins = 0, losses = 0;
                 try {
                     const rankResp = await fetch('/api/riot/rank', {
@@ -751,7 +745,6 @@
                 const finalGameName = playerInfo.gameName || gameName;
                 const finalTagLine  = playerInfo.tagLine  || tagLine;
 
-                // 3. 중복 행 병합 로직
                 const { data: dupRows, error: dupErr } = await sb.from('players')
                     .select('id, name, game_name, tag_line, puuid')
                     .or(`puuid.eq.${puuid},and(game_name.eq.${finalGameName},tag_line.eq.${finalTagLine})`);
@@ -774,7 +767,6 @@
                     }
                 }
 
-                // 4. DB 덮어쓰기
                 const updateData = {
                     puuid: puuid,
                     game_name: finalGameName,
@@ -833,280 +825,6 @@
             const gameName = gnInput ? gnInput.value.trim() : '';
             const tagLine = tlInput ? tlInput.value.trim() : '';
             window.linkRiotAccount(playerId, gameName, tagLine);
-        };
-
-        // ========== Riot API 연동 (검색 섹션) ==========
-        async function searchSummoner() {
-            const gameName = document.getElementById('gameName').value.trim();
-            const tagLine = document.getElementById('tagLine').value.trim().toUpperCase();
-            if (!gameName || !tagLine) return window.showToast('게임명과 태그를 모두 입력하세요.', 'warning');
-            
-            const btn = document.getElementById('searchBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="loading"></span>검색 중...';
-            
-            try {
-                const resp = await fetch('/api/riot/summoner', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ gameName, tagLine })
-                });
-                const data = await resp.json();
-                if (!resp.ok) throw new Error(data.error || '소환사 검색 실패');
-                
-                currentSummonerData = data.player || data;
-                const targetPuuid = currentSummonerData.puuid;
-                
-                if (targetPuuid) {
-                    try {
-                        const rankResp = await fetch('/api/riot/rank', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ puuid: targetPuuid })
-                        });
-                        const rankData = await rankResp.json();
-                        
-                        if (rankResp.ok) {
-                            const rawRank = rankData.rank || rankData; 
-                            let soloRank = null;
-                            if (Array.isArray(rawRank)) {
-                                soloRank = rawRank.find(r => r.queueType === 'RANKED_SOLO_5x5');
-                                if (!soloRank && rawRank.length > 0) soloRank = rawRank[0];
-                            } else {
-                                soloRank = rawRank;
-                            }
-
-                            if (soloRank && soloRank.tier) {
-                                currentSummonerData.tier = soloRank.tier;
-                                currentSummonerData.rank = soloRank.rank;
-                                currentSummonerData.leaguePoints = soloRank.leaguePoints;
-                                currentSummonerData.wins = soloRank.wins;
-                                currentSummonerData.losses = soloRank.losses;
-                            } else {
-                                currentSummonerData.tier = 'UNRANKED';
-                                currentSummonerData.rank = 'IV';
-                                currentSummonerData.leaguePoints = 0;
-                                currentSummonerData.wins = 0;
-                                currentSummonerData.losses = 0;
-                            }
-
-                            const calculatedMMR = calculateMMRFromTier(
-                                currentSummonerData.tier,
-                                currentSummonerData.rank,
-                                currentSummonerData.leaguePoints
-                            );
-                            currentSummonerData.mmr = calculatedMMR;
-                            
-                            await sb.from('players').update({
-                                tier: currentSummonerData.tier,
-                                rank: currentSummonerData.rank,
-                                league_points: currentSummonerData.leaguePoints,
-                                wins: currentSummonerData.wins,
-                                losses: currentSummonerData.losses,
-                                mmr: calculatedMMR
-                            }).eq('puuid', targetPuuid);
-                            
-                            loadPlayers();
-                        }
-                    } catch (err) {
-                        console.warn('티어 갱신 튕김:', err);
-                    }
-                }
-
-                showSummonerResult(currentSummonerData);
-                window.showToast('소환사 검색 완료!', 'success');
-            } catch (err) {
-                window.showToast(err.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<span class="btn-text">검색 후 등록</span>';
-            }
-        }
-
-        function showSummonerResult(player) {
-            document.getElementById('resultName').textContent = player.gameName || player.name;
-            document.getElementById('resultTag').textContent = `#${player.tagLine}`;
-            document.getElementById('resultLevel').textContent = `Lv. ${player.summonerLevel || '?'}`;
-            
-            const iconId = player.profileIconId || 0;
-            document.getElementById('profileIcon').src = `https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${iconId}.png`;
-            
-            const tierBadge = document.getElementById('tierBadge');
-            const mmrValue = document.getElementById('mmrValue');
-            const rankDetail = document.getElementById('rankDetail');
-            
-            const previewMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
-            mmrValue.textContent = previewMMR;
-            
-            if (player.tier && player.tier !== 'UNRANKED') {
-                tierBadge.className = `tier-badge ${player.tier.toLowerCase()}`;
-                tierBadge.textContent = formatTier(player.tier) + (player.rank ? ` ${player.rank}` : '');
-                
-                rankDetail.innerHTML = `
-                    <span>${player.leaguePoints || 0} LP</span>
-                    <span>${player.wins || 0}승 ${player.losses || 0}패</span>
-                `;
-            } else {
-                tierBadge.className = 'tier-badge unranked';
-                tierBadge.textContent = 'Unranked';
-                rankDetail.innerHTML = '<span>배치 미완료 (계산된 MMR: ' + previewMMR + '점)</span>';
-            }
-            
-            document.getElementById('summonerResult').classList.remove('hidden');
-        }
-
-        window.fetchRankForSummoner = async function(event) {
-            if (!currentSummonerData) return window.showToast('먼저 소환사를 검색하세요.', 'warning');
-            
-            const btn = document.querySelector('.result-actions .btn-secondary') || (event && event.currentTarget);
-            if(btn) { btn.disabled = true; btn.innerHTML = '<span class="loading"></span>갱신 중...'; }
-            
-            const targetPuuid = currentSummonerData.puuid;
-
-            try {
-                const rankResp = await fetch('/api/riot/rank', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ puuid: targetPuuid })
-                });
-                const rankData = await rankResp.json();
-                
-                if (!rankResp.ok) throw new Error(rankData.error || '티어 갱신 실패');
-                
-                const rawRank = rankData.rank || rankData;
-                let soloRank = null;
-                if (Array.isArray(rawRank)) {
-                    soloRank = rawRank.find(r => r.queueType === 'RANKED_SOLO_5x5');
-                    if (!soloRank && rawRank.length > 0) soloRank = rawRank[0];
-                } else {
-                    soloRank = rawRank;
-                }
-
-                if (soloRank && soloRank.tier) {
-                    currentSummonerData.tier = soloRank.tier;
-                    currentSummonerData.rank = soloRank.rank;
-                    currentSummonerData.leaguePoints = soloRank.leaguePoints;
-                    currentSummonerData.wins = soloRank.wins;
-                    currentSummonerData.losses = soloRank.losses;
-
-                    const calculatedMMR = calculateMMRFromTier(soloRank.tier, soloRank.rank, soloRank.leaguePoints);
-                    currentSummonerData.mmr = calculatedMMR;
-                    await sb.from('players').update({
-                        tier: soloRank.tier,
-                        rank: soloRank.rank,
-                        league_points: soloRank.leaguePoints,
-                        wins: soloRank.wins,
-                        losses: soloRank.losses,
-                        mmr: calculatedMMR
-                    }).eq('puuid', targetPuuid);
-                    loadPlayers();
-                }
-                showSummonerResult(currentSummonerData);
-                window.showToast('티어 정보 갱신 완료', 'success');
-            } catch (err) {
-                window.showToast(err.message, 'error');
-            } finally {
-                if(btn) { btn.disabled = false; btn.innerHTML = '🔄 티어 새로고침'; }
-            }
-        };
-
-        window.addSummonerToList = async function(autoParticipate = false) {
-            if (!currentSummonerData) return window.showToast('검색된 소환사가 없습니다.', 'warning');
-            
-            if (autoParticipate && participatingPlayers.length >= 10) {
-                window.showToast('이미 참가자가 10명이어서 매칭에는 참여할 수 없습니다. (명단에만 추가됩니다)', 'error');
-                autoParticipate = false;
-            }
-
-            const player = currentSummonerData;
-            const calculatedMMR = calculateMMRFromTier(player.tier, player.rank, player.leaguePoints);
-
-            const finalGameName = player.gameName || player.game_name || '';
-            const finalTagLine = player.tagLine || player.tag_line || '';
-
-            const riotPayload = {
-                puuid: player.puuid,
-                game_name: finalGameName,
-                tag_line: finalTagLine,
-                profile_icon_id: player.profileIconId || null,
-                summoner_level: player.summonerLevel || null,
-                tier: player.tier,
-                rank: player.rank,
-                league_points: player.leaguePoints,
-                wins: player.wins,
-                losses: player.losses,
-                mmr: calculatedMMR
-            };
-            const participationPayload = {
-                is_participating: autoParticipate ? true : (player.is_participating || false),
-                lock_team: autoParticipate ? 'none' : (player.lock_team || 'none')
-            };
-
-            try {
-                let updateResult = await sb.from('players')
-                    .update({ ...riotPayload, ...participationPayload })
-                    .eq('puuid', player.puuid)
-                    .select('id, name');
-
-                let updatedRow = (updateResult.data && updateResult.data[0]) || null;
-                if (updateResult.error) throw updateResult.error;
-
-                if (!updatedRow && finalGameName) {
-                    const { data: matched, error: matchErr } = await sb.from('players')
-                        .select('id, name, puuid')
-                        .eq('name', finalGameName)
-                        .is('puuid', null)
-                        .limit(1);
-                    if (matchErr) console.warn('기존 수동 행 조회 실패:', matchErr);
-                    if (matched && matched.length > 0) {
-                        const targetId = matched[0].id;
-                        const r = await sb.from('players')
-                            .update({ ...riotPayload, ...participationPayload })
-                            .eq('id', targetId)
-                            .select('id, name');
-                        if (r.error) throw r.error;
-                        updatedRow = (r.data && r.data[0]) || null;
-                    }
-                }
-
-                if (!updatedRow) {
-                    const { data: insData, error: insErr } = await sb.from('players').insert({
-                        puuid: player.puuid,
-                        game_name: finalGameName,
-                        tag_line: finalTagLine,
-                        name: finalGameName,
-                        profile_icon_id: player.profileIconId || null,
-                        summoner_level: player.summonerLevel || null,
-                        tier: player.tier,
-                        rank: player.rank,
-                        league_points: player.leaguePoints,
-                        wins: player.wins,
-                        losses: player.losses,
-                        mmr: calculatedMMR,
-                        is_participating: autoParticipate,
-                        lock_team: 'none'
-                    }).select('id, name');
-                    if (insErr) {
-                        if (insErr.code === '23505') {
-                            return window.showToast('이미 등록된 라이엇 계정입니다.', 'error');
-                        }
-                        return window.showToast('명단 추가 실패: ' + insErr.message, 'error');
-                    }
-                    updatedRow = (insData && insData[0]) || null;
-                }
-
-                const targetName = (updatedRow && updatedRow.name) || finalGameName;
-                window.showToast(`'${targetName}' 명단 갱신 완료 (점수: ${calculatedMMR}점)`, 'success');
-                document.getElementById('summonerResult').classList.add('hidden');
-                currentSummonerData = null;
-                loadPlayers();
-            } catch (err) {
-                console.error('addSummonerToList 에러:', err);
-                if (err && (err.code === '23505' || err.status === 409)) {
-                    return window.showToast('이미 등록된 라이엇 계정입니다.', 'error');
-                }
-                window.showToast('명단 추가 실패: ' + (err.message || '알 수 없는 오류'), 'error');
-            }
         };
 
         window.bulkAddToMatch = async function() {
@@ -1208,18 +926,10 @@
             }
         };
 
-        // ========== 리스너 및 시작 ==========
         document.addEventListener('DOMContentLoaded', init);
         
         document.getElementById('editModal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) window.closeModal();
-        });
-        
-        document.getElementById('gameName').addEventListener('keypress', (e) => { 
-            if (e.key === 'Enter') window.searchSummoner(); 
-        });
-        document.getElementById('tagLine').addEventListener('keypress', (e) => { 
-            if (e.key === 'Enter') window.searchSummoner(); 
         });
     </script>
 </body>
