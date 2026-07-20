@@ -204,7 +204,7 @@
     <div class="modal-overlay" id="editModal">
         <div class="modal">
             <h3>✏️ MMR 수동 수정</h3>
-            <p style="font-size: 12px; color: #f39c12; margin-bottom: 15px;">※ 점수를 수동으로 변경하면 <strong>DB 자동갱신을 피하기 위해 🔒고정(Lock) 모드로 자동 전환</strong>됩니다.</p>
+            <p style="font-size: 12px; color: #f39c12; margin-bottom: 15px;">※ 점수를 수동으로 변경하면 <strong>자동으로 🔒고정(Lock) 모드로 전환</strong>됩니다.</p>
             <input type="hidden" id="editPlayerId">
             <input type="number" id="editMmrInput" placeholder="새 MMR 점수" min="0" max="3000">
             <div class="modal-actions">
@@ -336,7 +336,7 @@
                             ${p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : ''}
                             <div style="display: flex; align-items: center; gap: 5px;">
                                 ${p.tier && p.tier !== 'UNRANKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                                ${p.wins < 0 ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 점수 고정됨</span>` : ''}
+                                ${p.wins < 0 ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -519,17 +519,16 @@
             await sb.from('players').update({ lock_team: team }).eq('id', id);
         };
         
-        // 🔥 [완벽 수정] 🔒 점수 고정 토글 (wins 값을 -1 로 바꿔서 구분)
+        // 🔒 락 토글 (wins 값을 음수로 만들어 고정)
         window.toggleMmrLock = async function(id, currentWins) {
             if (currentWins < 0) {
-                // 고정 해제 -> wins를 0으로 돌려놓음
                 const { error } = await sb.from('players').update({ wins: 0 }).eq('id', id);
                 if (!error) window.showToast('🔓 점수 고정이 해제되었습니다.', 'success');
             } else {
-                // 고정 걸기 -> wins를 -1로 만듦 (실제 데이터 훼손 없음)
                 const { error } = await sb.from('players').update({ wins: -1 }).eq('id', id);
                 if (!error) window.showToast('🔒 점수가 고정되었습니다.', 'success');
             }
+            loadPlayers(); // 즉시 화면 갱신 추가!
         };
 
         window.addToParticipants = async function(id) {
@@ -569,7 +568,7 @@
             document.getElementById('editModal').classList.remove('active');
         };
 
-        // 🔥 [완벽 수정] 수동 점수 편집 시, wins를 -1로 바꿔서 아이콘/티어 보존하면서 고정만 시킴
+        // 수동 점수 저장 (wins를 -1로 만들어 아이콘 손상 없이 점수 고정)
         window.saveMmr = async function() {
             const id = document.getElementById('editPlayerId').value;
             const mmr = parseInt(document.getElementById('editMmrInput').value);
@@ -577,7 +576,7 @@
             
             const { error } = await sb.from('players').update({ 
                 mmr: mmr,
-                wins: -1 // 승수를 음수로 만들어서 고정(🔒) 상태로 만듦
+                wins: -1 
             }).eq('id', id);
             
             if(error) {
@@ -585,12 +584,12 @@
             } else {
                 window.closeModal();
                 window.showToast('MMR 수동 변경 완료 (자동으로 점수 고정됨 🔒)', 'success');
+                loadPlayers(); // 즉시 화면 갱신 추가!
             }
         };
 
         // ========== 전체 명단 티어 일괄 갱신 ==========
         window.syncAllTiers = async function() {
-            // [방어막 적용] wins가 0 미만(즉 -1)인 사람은 고정(🔒)된 사람이므로 갱신 대상에서 제외!
             const playersToSync = allPlayersCache.filter(p => p.puuid && p.wins >= 0);
             const lockedCount = allPlayersCache.filter(p => p.puuid && p.wins < 0).length;
 
@@ -739,7 +738,7 @@
                     puuid: puuid, game_name: finalGameName, tag_line: finalTagLine,
                     profile_icon_id: playerInfo.profileIconId || null, summoner_level: playerInfo.summonerLevel || null,
                     tier: tier, rank: rank, league_points: leaguePoints, 
-                    wins: wins, // 계정 연결 시 다시 정상 승리 수로 덮어쓰므로 자동 잠금(Lock)이 해제됨!
+                    wins: wins, 
                     losses: losses,
                     mmr: calculatedMMR, last_rank_update: new Date().toISOString()
                 };
