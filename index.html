@@ -137,96 +137,86 @@
         .status-dot.error { background: var(--danger); }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-        /* 🔥 플레이어 리스트 아이템 (2단 레이아웃 핵심 수정) */
+        /* 🔥 플레이어 리스트 아이템 (가로 밀착형 압축 레이아웃) */
         .player-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
         .player-item { 
-            display: flex; flex-direction: column; /* 세로형 2단 분리 */
-            background: var(--bg-base); 
-            border: 1px solid var(--border-color); 
-            border-radius: var(--radius-md); 
-            padding: 14px 16px; 
-            transition: all 0.2s ease; 
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+            background: var(--bg-base); border: 1px solid var(--border-color); 
+            border-radius: var(--radius-md); padding: 12px; transition: all 0.2s ease; 
         }
         .player-item:hover { border-color: var(--secondary-hover); }
         .player-item.locked-a { border-left: 4px solid var(--team-a); }
         .player-item.locked-b { border-left: 4px solid var(--team-b); }
         
-        .player-item-header {
-            display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 10px;
-        }
-        
         .player-main { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
         .player-avatar { 
-            width: 44px; height: 44px; border-radius: 50%; 
+            width: 42px; height: 42px; border-radius: 50%; 
             background: var(--bg-hover); display: flex; align-items: center; justify-content: center; 
             overflow: hidden; flex-shrink: 0; border: 2px solid var(--bg-card);
         }
         .player-avatar img { width: 100%; height: 100%; object-fit: cover; }
         
         .player-info { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
-        .player-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
-        .player-tag { font-size: 12px; color: var(--text-muted); }
         
-        /* 뱃지 공간 분리 및 세로 깨짐 방지 */
-        .player-badges { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+        /* 이름 & 태그 한 줄 */
+        .name-row { display: flex; align-items: baseline; gap: 6px; width: 100%; overflow: hidden; }
+        .player-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
+        .player-tag { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+        
+        /* 🔥 뱃지와 미니버튼을 한 줄에 밀착 */
+        .badge-action-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
         .player-rank { 
-            font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: 600; 
-            background: var(--bg-hover); color: var(--text-main); 
-            white-space: nowrap; /* 뱃지 텍스트 찢어짐 방지 핵심 */
-            word-break: keep-all; 
+            font-size: 10px; padding: 4px 6px; border-radius: 10px; font-weight: 600; 
+            background: var(--bg-hover); color: var(--text-main); white-space: nowrap; 
         }
         .player-rank.locked-badge { background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
         
-        .player-mmr { font-weight: 800; color: var(--warning); font-size: 18px; margin-left: 10px; flex-shrink: 0; }
-        
-        /* 2층: 리스트 액션 버튼 (아래로 밀어냄) */
-        .player-actions { 
-            display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; 
-            width: 100%; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-color); 
+        /* 초미니 아이콘 버튼 */
+        .btn-icon.mini { 
+            width: 26px; height: 26px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; padding: 0; 
+            background: var(--bg-hover); color: var(--text-muted); transition: all 0.2s ease;
         }
-        
-        .lock-select { padding: 8px 12px; min-width: 90px; height: 36px; }
-        .btn-icon { 
-            width: 36px; height: 36px; border: none; border-radius: var(--radius-sm); 
-            cursor: pointer; display: flex; align-items: center; justify-content: center; 
-            font-size: 16px; transition: all 0.2s ease; background: var(--bg-hover); color: var(--text-muted);
+        .btn-icon.mini:hover { background: var(--secondary-hover); color: white; transform: scale(1.05); }
+        .btn-add-participant:hover { background: var(--success) !important; color: white !important; }
+        .btn-edit:hover { background: var(--primary) !important; color: white !important; }
+        .btn-delete:hover { background: var(--danger) !important; color: white !important; }
+        .btn-lock { color: var(--warning) !important; background: rgba(245, 158, 11, 0.15) !important; border: 1px solid rgba(245, 158, 11, 0.3) !important; }
+        .btn-lock:hover { background: var(--warning) !important; color: white !important; }
+
+        /* 🔥 우측: 점수 & 팀선택 압축 */
+        .player-right-panel { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+        .player-mmr { font-weight: 800; color: var(--warning); font-size: 18px; text-align: right; }
+        .lock-select.mini-select { 
+            height: 24px; padding: 0 4px; font-size: 11px; min-width: 60px; text-align: center; 
+            border-radius: var(--radius-sm); border: 1px solid var(--border-color); 
         }
-        .btn-icon:hover { background: var(--secondary-hover); color: white; }
-        
-        .btn-add-participant:hover { background: var(--success); color: white; }
-        .btn-edit:hover { background: var(--primary); color: white; }
-        .btn-delete:hover { background: var(--danger); color: white; }
-        
-        .btn-lock { color: var(--warning); background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); }
-        .btn-lock:hover { background: var(--warning); color: white; }
-        .btn-unlock { color: var(--text-muted); }
 
         /* 라이엇 인라인 연결 폼 */
         .riot-link-row { 
-            display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap; 
-            padding: 12px; background: rgba(99, 102, 241, 0.05); 
-            border-radius: var(--radius-sm); border: 1px dashed rgba(99, 102, 241, 0.3); width: 100%;
+            display: flex; gap: 8px; margin-top: 4px; align-items: center; flex-wrap: wrap; 
+            padding: 8px; background: rgba(99, 102, 241, 0.05); border-radius: var(--radius-sm); border: 1px dashed rgba(99, 102, 241, 0.3); width: 100%;
         }
-        .riot-link-row input { padding: 8px 12px; height: 36px; }
-        .riot-link-row input.riot-gn { flex: 1; min-width: 120px; }
-        .riot-link-row input.riot-tl { width: 70px; text-transform: uppercase; }
-        .riot-link-row button { height: 36px; padding: 0 16px; background: var(--primary); color: white; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; border:none; }
+        .riot-link-row input { padding: 6px 10px; height: 32px; font-size: 12px; }
+        .riot-link-row input.riot-gn { flex: 1; min-width: 100px; }
+        .riot-link-row input.riot-tl { width: 50px; text-transform: uppercase; }
+        .riot-link-row button { height: 32px; padding: 0 12px; background: var(--primary); color: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; cursor: pointer; border:none; }
 
         /* 팀 배정 결과 섹션 */
         .teams-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 768px) { .teams-section { grid-template-columns: 1fr; } }
-        .team-box { background: var(--bg-base); border-radius: var(--radius-lg); padding: 20px; border: 2px solid var(--border-color); }
+        .team-box { background: var(--bg-base); border-radius: var(--radius-lg); padding: 15px; border: 2px solid var(--border-color); }
         .team-box.team-a { border-color: rgba(251, 113, 133, 0.3); }
         .team-box.team-b { border-color: rgba(56, 189, 248, 0.3); }
         
-        .team-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
-        .team-title { font-size: 18px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; }
+        .team-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+        .team-title { font-size: 16px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; }
         .team-title.a { color: var(--team-a); }
         .team-title.b { color: var(--team-b); }
-        .team-score { font-size: 24px; font-weight: 800; color: var(--warning); }
+        .team-score { font-size: 20px; font-weight: 800; color: var(--warning); }
         
-        .team-player { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-card); border-radius: var(--radius-md); margin-bottom: 8px; }
-        .team-player-info { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+        .team-player { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-card); border-radius: var(--radius-md); margin-bottom: 6px; }
+        .team-player-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 
         /* 유틸리티 */
         details { background: var(--bg-base); border-radius: var(--radius-md); padding: 12px 16px; border: 1px solid var(--border-color); margin-bottom: 15px; }
@@ -240,26 +230,26 @@
         /* 모달 & 토스트 */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 1000; }
         .modal-overlay.active { display: flex; }
-        .modal { background: var(--bg-card); border-radius: var(--radius-lg); padding: 32px; max-width: 400px; width: 90%; border: 1px solid var(--border-color); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-        .modal h3 { margin: 0 0 10px 0; font-size: 20px; }
+        .modal { background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; max-width: 350px; width: 90%; border: 1px solid var(--border-color); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .modal h3 { margin: 0 0 10px 0; font-size: 18px; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
         
-        .toast { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; border-radius: var(--radius-md); background: var(--bg-card); border-left: 4px solid var(--border-color); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 1001; animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); font-weight: 500; }
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; border-radius: var(--radius-md); background: var(--bg-card); border-left: 4px solid var(--border-color); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 1001; animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); font-weight: 500; font-size: 14px; }
         .toast.success { border-left-color: var(--success); }
         .toast.error { border-left-color: var(--danger); }
         .toast.warning { border-left-color: var(--warning); }
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         
-        .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+        .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.8s linear infinite; margin-right: 6px; vertical-align: middle; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* 🔥 레이아웃 동기화 (고정 높이) */
+        /* 레이아웃 동기화 (고정 높이) */
         .section-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; align-items: stretch; }
-        .fixed-height-card { flex: 1; min-width: 320px; height: 800px; display: flex; flex-direction: column; }
+        .fixed-height-card { flex: 1; min-width: 320px; height: 750px; display: flex; flex-direction: column; }
         
         .scroll-container { 
             flex: 1; overflow-y: auto; min-height: 0; 
-            padding-right: 10px; margin-top: 15px; 
+            padding-right: 8px; margin-top: 10px; 
         }
         
         .scroll-container::-webkit-scrollbar { width: 6px; }
@@ -304,7 +294,7 @@
                     <button class="btn btn-secondary" style="width: 100%;" onclick="bulkAddPlayers()">목록 등록하기</button>
                 </details>
                 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
                     <span style="font-size: 13px; color: var(--text-muted);">명단 관리 (➕로 참가)</span>
                     <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="syncAllTiers()">🔄 티어 일괄 갱신</button>
                 </div>
@@ -324,10 +314,10 @@
                     <button class="btn btn-secondary" style="width: 100%;" onclick="bulkAddToMatch()">참가자 넘기기</button>
                 </details>
                 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-                    <div style="font-size: 13px; color: var(--text-muted); display: flex; gap: 8px; align-items: center;">
-                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--team-a);"></span> A팀 고정
-                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--team-b);"></span> B팀 고정
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                    <div style="font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; align-items: center;">
+                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--team-a);"></span> A팀
+                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--team-b);"></span> B팀
                     </div>
                     <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="clearAllParticipants()">전체 비우기</button>
                 </div>
@@ -336,11 +326,11 @@
                     <ul class="player-list" id="participantList"></ul>
                 </div>
                 
-                <div style="margin-top: 20px; text-align: center; flex-shrink: 0;">
-                    <button class="btn btn-primary" style="padding: 16px; font-size: 16px; width: 100%;" id="makeTeamsBtn" onclick="makeTeams()" disabled>
+                <div style="margin-top: 15px; text-align: center; flex-shrink: 0;">
+                    <button class="btn btn-primary" style="padding: 14px; font-size: 16px; width: 100%;" id="makeTeamsBtn" onclick="makeTeams()" disabled>
                         공평하게 팀 나누기
                     </button>
-                    <p id="makeTeamsMsg" class="muted" style="margin-top: 12px;">참가자가 10명일 때 활성화됩니다.</p>
+                    <p id="makeTeamsMsg" class="muted" style="margin-top: 10px;">참가자가 10명일 때 활성화됩니다.</p>
                 </div>
             </div>
         </div>
@@ -371,8 +361,8 @@
     <div class="modal-overlay" id="editModal">
         <div class="modal">
             <h3>MMR 수동 수정</h3>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5;">
-                수동 인원은 입력한 점수가 그대로 적용되며,<br>라이엇 연동 계정은 갱신 보호를 위해 <span style="color:var(--warning);">자동으로 고정(🔒) 모드</span>로 전환됩니다.
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5;">
+                수동 인원은 입력한 점수가 적용되며,<br>라이엇 연동 계정은 갱신 보호를 위해 <span style="color:var(--warning);">자동 🔒고정 모드</span>로 변경됩니다.
             </p>
             <input type="hidden" id="editPlayerId">
             <input type="number" id="editMmrInput" placeholder="새 점수 입력" min="0" max="3000">
@@ -390,7 +380,7 @@
         let participatingPlayers = [];
         let linkingInProgress = new Set(); 
 
-        // ========== 기능 로직 (기존 버그 픽스 100% 동일 유지) ==========
+        // ========== 기능 로직 ==========
         function calculateMMRFromTier(tier, rank, leaguePoints) {
             const tierUpper = (tier || 'UNRANKED').toUpperCase();
             const rankUpper = (rank || 'IV').toUpperCase();
@@ -506,69 +496,70 @@
             updateMakeTeamsButton();
         }
 
-        // 🔥 HTML 구조 생성 (2단 레이아웃 반영 완료)
+        // 🔥 HTML 구조 생성 (가로 밀착형 2단 레이아웃 반영)
         function playerItemHTML(p, isParticipant = false, index = 0) {
-            const indexSpan = isParticipant ? `<span style="color:var(--text-muted); font-weight:bold; min-width:20px; font-size:14px;">${index}.</span>` : '';
+            const indexSpan = isParticipant ? `<span style="color:var(--text-muted); font-weight:bold; min-width:18px; font-size:13px; flex-shrink:0;">${index}.</span>` : '';
             const avatar = p.profile_icon_id !== null 
                 ? `<img src="https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${p.profile_icon_id}.png" alt="">` 
                 : '👤';
             
-            const tagStr = p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : '';
+            const tagStr = p.game_name && p.tag_line ? `<span class="player-tag">${p.game_name}#${p.tag_line}</span>` : '';
             
             let badges = '';
             if (p.tier && p.tier !== 'UNRANKED' && p.puuid) {
                 badges += `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>`;
             }
             if (p.puuid && p.is_locked) {
-                badges += `<span class="player-rank locked-badge">🔒 고정됨</span>`;
+                badges += `<span class="player-rank locked-badge">🔒 고정</span>`;
             }
 
+            const actionBtn = isParticipant
+                ? `<button class="btn-icon mini btn-delete" onclick="window.removeFromMatch('${p.id}')" title="명단으로 내리기">✖</button>`
+                : `<button class="btn-icon mini btn-add-participant" onclick="window.addToParticipants('${p.id}')" title="참가">➕</button>`;
+
+            const lockBtn = p.puuid 
+                ? `<button class="btn-icon mini ${p.is_locked ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.is_locked}, ${p.mmr})" title="점수 고정">${p.is_locked ? '🔒' : '🔓'}</button>` 
+                : '';
+
             const lockSelect = `
-                <select class="lock-select" onchange="window.toggleLockTeam('${p.id}', this.value)">
+                <select class="lock-select mini-select" onchange="window.toggleLockTeam('${p.id}', this.value)" title="팀 고정">
                     <option value="none" ${p.lock_team === 'none' || !p.lock_team ? 'selected' : ''}>자유</option>
                     <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>A팀</option>
                     <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀</option>
                 </select>
             `;
 
-            const actionBtn = isParticipant
-                ? `<button class="btn-icon btn-delete" onclick="window.removeFromMatch('${p.id}')" title="대기 명단으로 내리기">✖</button>`
-                : `<button class="btn-icon btn-add-participant" onclick="window.addToParticipants('${p.id}')" title="참가">➕</button>`;
-
-            const lockBtn = p.puuid 
-                ? `<button class="btn-icon ${p.is_locked ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.is_locked}, ${p.mmr})" title="점수 고정 켜기/끄기">${p.is_locked ? '🔒' : '🔓'}</button>` 
-                : '';
-
             const riotLink = !p.puuid ? `
                 <div class="riot-link-row">
-                    <input type="text" class="riot-gn" data-player-id="${p.id}" placeholder="게임명 (Hide on bush)" autocomplete="off">
+                    <input type="text" class="riot-gn" data-player-id="${p.id}" placeholder="게임명 (예: Hide on bush)" autocomplete="off">
                     <input type="text" class="riot-tl" data-player-id="${p.id}" placeholder="KR1" maxlength="5">
                     <button onclick="window.handleLinkClick('${p.id}')" id="linkBtn-${p.id}">연결</button>
                 </div>
             ` : '';
 
-            // 🔥 1층(헤더)과 2층(액션) 완벽 분리
+            // 🔥 아바타-이름-뱃지-버튼을 좌측에 뭉치고, MMR과 셀렉트를 우측으로 분리
             return `
                 <li class="player-item ${p.lock_team === 'A' ? 'locked-a' : ''} ${p.lock_team === 'B' ? 'locked-b' : ''}" data-id="${p.id}">
-                    <div class="player-item-header">
-                        <div class="player-main">
-                            ${indexSpan}
-                            <div class="player-avatar">${avatar}</div>
-                            <div class="player-info">
-                                <div class="player-name">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
+                    <div class="player-main">
+                        ${indexSpan}
+                        <div class="player-avatar">${avatar}</div>
+                        <div class="player-info">
+                            <div class="name-row">
+                                <span class="player-name">${escapeHtml(p.name || p.game_name || '이름없음')}</span>
                                 ${tagStr}
-                                <div class="player-badges">${badges}</div>
+                            </div>
+                            <div class="badge-action-row">
+                                ${badges}
+                                ${actionBtn}
+                                ${lockBtn}
+                                <button class="btn-icon mini btn-edit" onclick="window.editPlayer('${p.id}', '${p.mmr}')" title="수정">✏️</button>
+                                <button class="btn-icon mini btn-delete" onclick="window.deletePlayer('${p.id}')" title="삭제">🗑️</button>
                             </div>
                         </div>
-                        <div class="player-mmr">${p.mmr}</div>
                     </div>
-                    
-                    <div class="player-actions">
+                    <div class="player-right-panel">
+                        <div class="player-mmr">${p.mmr}</div>
                         ${lockSelect}
-                        ${actionBtn}
-                        ${lockBtn}
-                        <button class="btn-icon btn-edit" onclick="window.editPlayer('${p.id}', '${p.mmr}')" title="수정">✏️</button>
-                        <button class="btn-icon btn-delete" onclick="window.deletePlayer('${p.id}')" title="삭제">🗑️</button>
                     </div>
                     ${riotLink}
                 </li>
@@ -614,18 +605,18 @@
                     <li class="team-player">
                         <div class="team-player-info">
                             <span style="color:var(--text-muted); font-weight:bold; min-width:16px;">${idx + 1}.</span>
-                            <div class="player-avatar" style="width:32px; height:32px; border-width: 1px; flex-shrink: 0;">
+                            <div class="player-avatar" style="width:28px; height:28px; border-width: 1px; flex-shrink: 0;">
                                 ${p.profile_icon_id !== null ? `<img src="https://ddragon.leagueoflegends.com/cdn/14.14.1/img/profileicon/${p.profile_icon_id}.png" alt="">` : '👤'}
                             </div>
-                            <div class="player-info">
-                                <div class="player-name" style="font-size:14px;">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
-                                <div class="player-badges" style="margin-top: 2px;">
-                                    ${p.tier && p.tier !== 'UNRANKED' && p.puuid ? `<span class="player-rank tier-${p.tier.toLowerCase()}" style="font-size: 10px; padding: 2px 6px;">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                                    ${p.puuid && p.is_locked ? `<span class="player-rank locked-badge" style="font-size: 10px; padding: 2px 6px;">🔒</span>` : ''}
+                            <div class="player-info" style="gap: 2px;">
+                                <div class="player-name" style="font-size:13px;">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
+                                <div class="badge-action-row" style="gap: 2px;">
+                                    ${p.tier && p.tier !== 'UNRANKED' && p.puuid ? `<span class="player-rank tier-${p.tier.toLowerCase()}" style="font-size: 9px; padding: 2px 4px;">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                                    ${p.puuid && p.is_locked ? `<span class="player-rank locked-badge" style="font-size: 9px; padding: 2px 4px;">🔒</span>` : ''}
                                 </div>
                             </div>
                         </div>
-                        <div class="team-player-mmr" style="font-size:15px;">${p.mmr}</div>
+                        <div class="team-player-mmr" style="font-size:14px;">${p.mmr}</div>
                     </li>
                 `).join('');
             };
