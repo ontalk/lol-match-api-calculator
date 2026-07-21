@@ -47,6 +47,7 @@
         .btn-delete { background: rgba(231,76,60,0.2); color: #e74c3c; }
         .btn-delete:hover { background: #e74c3c; color: white; }
         
+        /* 고정 버튼 스타일 */
         .btn-lock { background: rgba(243, 156, 18, 0.2); color: #f39c12; border: 1px solid rgba(243, 156, 18, 0.5); }
         .btn-lock:hover { background: #f39c12; color: white; }
         .btn-unlock { background: rgba(149, 165, 166, 0.1); color: #7f8c8d; }
@@ -100,6 +101,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .muted { color: #888; font-size: 12px; }
         
+        /* 🔥 레이아웃 동기화 (고정 높이) */
         .section-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
         .fixed-height-card { flex: 1; min-width: 300px; height: 750px; margin-bottom: 0; display: flex; flex-direction: column; }
         .scroll-container { flex: 1; overflow-y: auto; min-height: 0; padding-right: 8px; margin-top: 10px; }
@@ -202,7 +204,9 @@
     <div class="modal-overlay" id="editModal">
         <div class="modal">
             <h3>✏️ MMR 수동 수정</h3>
-            <p style="font-size: 12px; color: #f39c12; margin-bottom: 15px;">※ 수동 인원은 입력한 점수가 그대로 고정되며, 라이엇 계정은 자동 🔒고정 모드가 됩니다.</p>
+            <p style="font-size: 12px; color: #f39c12; margin-bottom: 15px;">
+                ※ 라이엇 연동 계정은 점수 수정 시 <strong>자동으로 🔒고정(Lock) 모드로 전환</strong>되어 보호됩니다. (수동 인원은 바로 영구 반영됩니다.)
+            </p>
             <input type="hidden" id="editPlayerId">
             <input type="number" id="editMmrInput" placeholder="새 MMR 점수" min="0" max="3000">
             <div class="modal-actions">
@@ -219,7 +223,6 @@
         let participatingPlayers = [];
         let linkingInProgress = new Set(); 
 
-        // ========== 티어/랭크 기반 MMR 계산 함수 ==========
         function calculateMMRFromTier(tier, rank, leaguePoints) {
             const tierUpper = (tier || 'UNRANKED').toUpperCase();
             const rankUpper = (rank || 'IV').toUpperCase();
@@ -247,7 +250,6 @@
             return Math.round(finalMmr);
         }
 
-        // ========== 초기화 ==========
         async function init() {
             window.updateStatus('connecting', '설정 로드 중...');
             try {
@@ -299,6 +301,7 @@
               .subscribe();
         }
 
+        // 🔥 [완전 종결판] 데이터 로드 및 찌꺼기 완벽 청소
         async function loadPlayers() {
             const { data, error } = await sb.from('players').select('*');
             if (error) { 
@@ -310,21 +313,34 @@
             let players = data || [];
             
             players.forEach(p => {
-                // 이전 버그로 음수가 된 아이콘 찌꺼기 자동 치료
+                // 1. 과거 꼼수 쓰다 남은 마이너스 아이콘 복구
                 if (p.profile_icon_id !== null && p.profile_icon_id < 0) {
                     p.profile_icon_id = null;
                     sb.from('players').update({ profile_icon_id: null }).eq('id', p.id);
                 }
+                
+                // 2. 과거 꼼수 쓰다 남은 'LOCKED' 글자 청소 (DB 트리거 발동 방지)
+                if (p.tier === 'LOCKED') {
+                    p.tier = 'UNRANKED';
+                }
 
+                // 3. 우회 점수 추출 (수동 인원 & 연동 인원 분리 처리)
                 if (!p.puuid) {
-                    // 🔗 라이엇 연동이 안 된 "수동 인원": 데이터베이스 mmr 칸에 있는 점수를 그대로 사용!
-                    // (언랭크여도 1200점으로 초기화되지 않고 입력한 점수가 영구 유지됨)
-                    p.is_locked = true; // 수동 인원은 기본적으로 점수 고정 상태
-                } else {
-                    // 🔗 라이엇 연동된 인원: 기존 락(losses 우회법) 적용 여부 확인
+                    // [수동 인원] - 롤 계정이 없는 사람
+                    // 수동 인원은 애초에 갱신될 일이 없으므로 잠금(Lock) 개념이 아예 필요 없음.
+                    // losses 우회도 필요 없이 무조건 DB에 있는 mmr을 신뢰함.
+                    p.is_locked = false; 
+                    
+                    // 만약 예전 꼼수 때문에 losses에 숨겨져 있다면 빼오고 정상화시킴
                     if (p.losses !== null && p.losses <= -10000) {
                         p.mmr = Math.abs(p.losses) - 10000;
-                        p.is_locked = true;
+                        sb.from('players').update({ mmr: p.mmr, losses: 0 }).eq('id', p.id); // 정상화
+                    }
+                } else {
+                    // [연동 인원] - 롤 계정이 있는 사람 (전적 갱신 시 덮어쓰기를 막을 잠금이 필요)
+                    if (p.losses !== null && p.losses <= -10000) {
+                        p.mmr = Math.abs(p.losses) - 10000; // 숨겨둔 수동 점수 꺼내기
+                        p.is_locked = true; // 잠금 상태 표시
                     } else {
                         p.is_locked = false;
                     }
@@ -359,8 +375,8 @@
                             <div class="player-name">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
                             ${p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : ''}
                             <div style="display: flex; align-items: center; gap: 5px;">
-                                ${p.tier && p.tier !== 'UNRANKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                                ${p.is_locked ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
+                                ${p.tier && p.tier !== 'UNRANKED' && p.puuid ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                                ${p.puuid && p.is_locked ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -406,8 +422,8 @@
                             <div class="player-name">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
                             ${p.game_name && p.tag_line ? `<div class="player-tag">${p.game_name}#${p.tag_line}</div>` : ''}
                             <div style="display: flex; align-items: center; gap: 5px;">
-                                ${p.tier && p.tier !== 'UNRANKED' ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                                ${p.is_locked ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
+                                ${p.tier && p.tier !== 'UNRANKED' && p.puuid ? `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                                ${p.puuid && p.is_locked ? `<span class="player-rank" style="background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243,156,18,0.3);">🔒 고정됨</span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -453,8 +469,8 @@
                                 ${p.game_name && p.tag_line ? `<div class="player-tag" style="font-size:10px;">${p.game_name}#${p.tag_line}</div>` : ''}
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                ${p.tier && p.tier !== 'UNRANKED' ? `<span class="team-player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
-                                ${p.is_locked ? `<span class="team-player-rank" style="color:#f39c12; background:rgba(243,156,18,0.15);">🔒</span>` : ''}
+                                ${p.tier && p.tier !== 'UNRANKED' && p.puuid ? `<span class="team-player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
+                                ${p.puuid && p.is_locked ? `<span class="team-player-rank" style="color:#f39c12; background:rgba(243,156,18,0.15);">🔒</span>` : ''}
                             </div>
                         </div>
                         <div class="team-player-mmr">${p.mmr}</div>
@@ -508,11 +524,8 @@
             const mmr = parseInt(document.getElementById('playerMmr').value) || 1200;
             if (!name) return window.showToast('이름을 입력하세요.', 'warning');
             
-            // 수동 추가 인원은 mmr 칸에 직접 저장합니다.
-            const { error } = await sb.from('players').insert({ 
-                name: name,
-                mmr: mmr
-            });
+            // 수동 추가 인원은 DB의 mmr 컬럼에 그대로 직행합니다. (트리거 우회 필요 없음)
+            const { error } = await sb.from('players').insert({ name: name, mmr: mmr });
             if (error) { console.error(error); window.showToast('추가 실패: ' + error.message, 'error'); return; }
             
             document.getElementById('playerName').value = '';
@@ -547,15 +560,17 @@
             await sb.from('players').update({ lock_team: team }).eq('id', id);
         };
         
-        // 🔒 라이엇 연동 계정 전용 락 토글
+        // 🔒 연동 계정 전용: 락 토글 기능
         window.toggleMmrLock = async function(id, isLocked, currentMmr) {
             if (isLocked) {
+                // 고정 해제 -> losses를 0으로 돌려놓아 DB 트리거의 진짜 mmr를 다시 사용
                 const { error } = await sb.from('players').update({ losses: 0 }).eq('id', id);
-                if (!error) window.showToast('🔓 점수 고정이 해제되었습니다.', 'success');
+                if (!error) window.showToast('🔓 점수 고정이 해제되었습니다. (티어 갱신 시 다시 라이엇 점수가 적용됩니다)', 'success');
             } else {
+                // 고정 걸기 -> losses를 음수로 만들어 현재 mmr을 숨겨놓음
                 const lockValue = -(currentMmr + 10000);
                 const { error } = await sb.from('players').update({ losses: lockValue }).eq('id', id);
-                if (!error) window.showToast('🔒 점수가 고정되었습니다.', 'success');
+                if (!error) window.showToast('🔒 점수가 고정되었습니다. (티어를 갱신해도 보호됩니다)', 'success');
             }
             loadPlayers();
         };
@@ -597,7 +612,7 @@
             document.getElementById('editModal').classList.remove('active');
         };
 
-        // 🔥 [완벽 수정] 점수 수정 시: 수동 인원은 mmr 칸에 직접 저장, 연동 인원은 losses 우회법 적용
+        // 🔥 [완전 종결판] 수동 점수 저장 시 수동 인원 vs 연동 인원 완벽 분리 처리
         window.saveMmr = async function() {
             const id = document.getElementById('editPlayerId').value;
             const mmr = parseInt(document.getElementById('editMmrInput').value);
@@ -607,11 +622,12 @@
             let updateData = {};
 
             if (player && !player.puuid) {
-                // 라이엇 연동 안 된 수동 인원: mmr 칸에 직접 저장 (1200점으로 절대 안 튕김)
+                // 수동 인원 (롤 연동 안됨): 그냥 mmr 칸에 정직하게 밀어넣으면 끝! (1200점 안됨)
                 updateData = { mmr: mmr };
             } else {
-                // 라이엇 연동된 인원: losses 우회법으로 락(Lock) 걸기
-                updateData = { losses: -(mmr + 10000) };
+                // 연동 인원 (롤 연동 됨): DB 트리거를 속이기 위해 losses 칸에 음수로 암호화해서 저장 (자동 잠금)
+                const lockValue = -(mmr + 10000);
+                updateData = { losses: lockValue };
             }
             
             const { error } = await sb.from('players').update(updateData).eq('id', id);
@@ -620,23 +636,28 @@
                 window.showToast('수정 실패: ' + error.message, 'error');
             } else {
                 window.closeModal();
-                window.showToast('MMR 수정 완료!', 'success');
+                if (player && player.puuid) {
+                    window.showToast('MMR 수동 변경 완료 (자동으로 점수 고정됨 🔒)', 'success');
+                } else {
+                    window.showToast('MMR 변경 완료', 'success');
+                }
                 loadPlayers();
             }
         };
 
         // ========== 전체 명단 티어 일괄 갱신 ==========
         window.syncAllTiers = async function() {
+            // 연동되었으면서 잠금되지 않은 인원만 갱신
             const playersToSync = allPlayersCache.filter(p => p.puuid && !p.is_locked);
             const lockedCount = allPlayersCache.filter(p => p.puuid && p.is_locked).length;
 
             if (playersToSync.length === 0) {
-                if (lockedCount > 0) return window.showToast(`고정된 라이엇 계정은 보호됩니다.`, 'warning');
+                if (lockedCount > 0) return window.showToast(`명단의 라이엇 계정들이 모두 고정(🔒)되어 있어 갱신이 필요 없습니다.`, 'warning');
                 return window.showToast('갱신할 라이엇 계정이 명단에 없습니다.', 'warning');
             }
             
-            let msg = `명단에 등록된 ${playersToSync.length}명의 점수를 최신화하시겠습니까?`;
-            if (lockedCount > 0) msg += `\n\n※ 점수가 고정(🔒)된 ${lockedCount}명은 보호됩니다.`;
+            let msg = `명단에 등록된 ${playersToSync.length}명의 점수를 최신화하시겠습니까?\n(시간이 약간 소요될 수 있습니다)`;
+            if (lockedCount > 0) msg += `\n\n※ 점수가 고정(🔒)된 ${lockedCount}명은 갱신에서 안전하게 보호됩니다.`;
 
             if (!confirm(msg)) return;
 
@@ -775,7 +796,9 @@
                     puuid: puuid, game_name: finalGameName, tag_line: finalTagLine,
                     profile_icon_id: playerInfo.profileIconId || null, summoner_level: playerInfo.summonerLevel || null,
                     tier: tier, rank: rank, league_points: leaguePoints, 
-                    wins: wins, losses: losses, mmr: calculatedMMR, last_rank_update: new Date().toISOString()
+                    wins: wins, 
+                    losses: losses, // 실제 라이엇 패배 횟수로 덮어씌워지므로 고정(Lock) 모드가 해제됨
+                    mmr: calculatedMMR, last_rank_update: new Date().toISOString()
                 };
 
                 const { data: updated, error } = await sb.from('players').update(updateData).eq('id', playerId).select('id, name');
@@ -786,16 +809,20 @@
                 }
 
                 if (!updated || updated.length === 0) {
-                    window.showToast('플레이어를 찾을 수 없습니다.', 'error');
+                    window.showToast('플레이어를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.', 'error');
                     loadPlayers(); return;
                 }
 
-                window.showToast(`'${updated[0].name || finalGameName}' 연동 완료!`, 'success');
+                window.showToast(`'${updated[0].name || finalGameName}' 연동 완료! (${formatTier(tier)} ${rank})`, 'success');
                 loadPlayers();
 
             } catch (err) {
                 console.error('라이엇 연동 에러:', err);
-                window.showToast(err.message || '소환사를 찾을 수 없습니다.', 'error');
+                if (err.message.includes('404') || err.message.includes('찾을 수 없')) {
+                    window.showToast('소환사를 찾을 수 없습니다.', 'error');
+                } else {
+                    window.showToast(err.message, 'error');
+                }
             } finally {
                 linkingInProgress.delete(playerId);
                 if (btn) { btn.disabled = false; btn.textContent = '계정 연결'; }
