@@ -170,6 +170,7 @@
             background: var(--bg-hover); color: var(--text-main); white-space: nowrap; 
         }
         .player-rank.locked-badge { background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
+        .player-rank.role-badge { background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); }
         
         /* 초미니 아이콘 버튼 */
         .btn-icon.mini { 
@@ -184,9 +185,10 @@
         .btn-lock { color: var(--warning) !important; background: rgba(245, 158, 11, 0.15) !important; border: 1px solid rgba(245, 158, 11, 0.3) !important; }
         .btn-lock:hover { background: var(--warning) !important; color: white !important; }
 
-        /* 🔥 우측: 점수 & 팀선택 압축 */
+        /* 🔥 우측: 점수 & 팀/포지션 선택 압축 */
         .player-right-panel { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
-        .player-mmr { font-weight: 800; color: var(--warning); font-size: 18px; text-align: right; }
+        .player-mmr { font-weight: 800; color: var(--warning); font-size: 18px; text-align: right; margin-bottom: 2px; }
+        .select-group { display: flex; gap: 4px; }
         .lock-select.mini-select { 
             height: 24px; padding: 0 4px; font-size: 11px; min-width: 60px; text-align: center; 
             border-radius: var(--radius-sm); border: 1px solid var(--border-color); 
@@ -328,7 +330,7 @@
                 
                 <div style="margin-top: 15px; text-align: center; flex-shrink: 0;">
                     <button class="btn btn-primary" style="padding: 14px; font-size: 16px; width: 100%;" id="makeTeamsBtn" onclick="makeTeams()" disabled>
-                        공평하게 팀 나누기
+                        ⚖️ 공평하게 팀 나누기
                     </button>
                     <p id="makeTeamsMsg" class="muted" style="margin-top: 10px;">참가자가 10명일 때 활성화됩니다.</p>
                 </div>
@@ -380,7 +382,8 @@
         let participatingPlayers = [];
         let linkingInProgress = new Set(); 
 
-        // ========== 기능 로직 ==========
+        const ROLE_NAMES = { 'top': '탑', 'jungle': '정글', 'mid': '미드', 'adc': '원딜', 'support': '서폿' };
+
         function calculateMMRFromTier(tier, rank, leaguePoints) {
             const tierUpper = (tier || 'UNRANKED').toUpperCase();
             const rankUpper = (rank || 'IV').toUpperCase();
@@ -496,7 +499,7 @@
             updateMakeTeamsButton();
         }
 
-        // 🔥 HTML 구조 생성 (가로 밀착형 2단 레이아웃 반영)
+        // 🔥 HTML 구조 생성 (가로 밀착형 압축 레이아웃 + 포지션 기능 추가)
         function playerItemHTML(p, isParticipant = false, index = 0) {
             const indexSpan = isParticipant ? `<span style="color:var(--text-muted); font-weight:bold; min-width:18px; font-size:13px; flex-shrink:0;">${index}.</span>` : '';
             const avatar = p.profile_icon_id !== null 
@@ -506,6 +509,9 @@
             const tagStr = p.game_name && p.tag_line ? `<span class="player-tag">${p.game_name}#${p.tag_line}</span>` : '';
             
             let badges = '';
+            if (p.role && p.role !== 'none') {
+                badges += `<span class="player-rank role-badge">${ROLE_NAMES[p.role]}</span>`;
+            }
             if (p.tier && p.tier !== 'UNRANKED' && p.puuid) {
                 badges += `<span class="player-rank tier-${p.tier.toLowerCase()}">${formatTier(p.tier)} ${p.rank || ''}</span>`;
             }
@@ -521,9 +527,21 @@
                 ? `<button class="btn-icon mini ${p.is_locked ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.is_locked}, ${p.mmr})" title="점수 고정">${p.is_locked ? '🔒' : '🔓'}</button>` 
                 : '';
 
+            // 🔥 우측 패널 콤보박스들 (포지션 선택 + 팀 고정)
+            const roleSelect = `
+                <select class="lock-select mini-select" onchange="window.updateRole('${p.id}', this.value)" title="포지션 지정">
+                    <option value="none" ${!p.role || p.role === 'none' ? 'selected' : ''}>포지션 자유</option>
+                    <option value="top" ${p.role === 'top' ? 'selected' : ''}>탑</option>
+                    <option value="jungle" ${p.role === 'jungle' ? 'selected' : ''}>정글</option>
+                    <option value="mid" ${p.role === 'mid' ? 'selected' : ''}>미드</option>
+                    <option value="adc" ${p.role === 'adc' ? 'selected' : ''}>원딜</option>
+                    <option value="support" ${p.role === 'support' ? 'selected' : ''}>서폿</option>
+                </select>
+            `;
+
             const lockSelect = `
                 <select class="lock-select mini-select" onchange="window.toggleLockTeam('${p.id}', this.value)" title="팀 고정">
-                    <option value="none" ${p.lock_team === 'none' || !p.lock_team ? 'selected' : ''}>자유</option>
+                    <option value="none" ${p.lock_team === 'none' || !p.lock_team ? 'selected' : ''}>팀 자유</option>
                     <option value="A" ${p.lock_team === 'A' ? 'selected' : ''}>A팀</option>
                     <option value="B" ${p.lock_team === 'B' ? 'selected' : ''}>B팀</option>
                 </select>
@@ -537,7 +555,6 @@
                 </div>
             ` : '';
 
-            // 🔥 아바타-이름-뱃지-버튼을 좌측에 뭉치고, MMR과 셀렉트를 우측으로 분리
             return `
                 <li class="player-item ${p.lock_team === 'A' ? 'locked-a' : ''} ${p.lock_team === 'B' ? 'locked-b' : ''}" data-id="${p.id}">
                     <div class="player-main">
@@ -559,7 +576,10 @@
                     </div>
                     <div class="player-right-panel">
                         <div class="player-mmr">${p.mmr}</div>
-                        ${lockSelect}
+                        <div class="select-group">
+                            ${roleSelect}
+                            ${lockSelect}
+                        </div>
                     </div>
                     ${riotLink}
                 </li>
@@ -611,6 +631,7 @@
                             <div class="player-info" style="gap: 2px;">
                                 <div class="player-name" style="font-size:13px;">${escapeHtml(p.name || p.game_name || '이름없음')}</div>
                                 <div class="badge-action-row" style="gap: 2px;">
+                                    ${p.role && p.role !== 'none' ? `<span class="player-rank role-badge" style="font-size: 9px; padding: 2px 4px;">${ROLE_NAMES[p.role]}</span>` : ''}
                                     ${p.tier && p.tier !== 'UNRANKED' && p.puuid ? `<span class="player-rank tier-${p.tier.toLowerCase()}" style="font-size: 9px; padding: 2px 4px;">${formatTier(p.tier)} ${p.rank || ''}</span>` : ''}
                                     ${p.puuid && p.is_locked ? `<span class="player-rank locked-badge" style="font-size: 9px; padding: 2px 4px;">🔒</span>` : ''}
                                 </div>
@@ -695,6 +716,10 @@
 
         window.toggleLockTeam = async function(id, team) {
             await sb.from('players').update({ lock_team: team }).eq('id', id);
+        };
+        
+        window.updateRole = async function(id, role) {
+            await sb.from('players').update({ role: role }).eq('id', id);
         };
         
         window.toggleMmrLock = async function(id, isLocked, currentMmr) {
@@ -900,6 +925,7 @@
             window.showToast(`${newParticipants.length}명 추가됨`, 'success');
         };
 
+        // 🔥 [포지션 분리 매칭 알고리즘 적용]
         window.makeTeams = async function() {
             if (participatingPlayers.length !== 10) return window.showToast('10명이 필요합니다.', 'warning');
             
@@ -907,34 +933,69 @@
             btn.disabled = true; btn.innerHTML = '<span class="loading"></span>계산 중...';
 
             try {
+                const totalPlayers = participatingPlayers.length;
+                const targetSize = Math.floor(totalPlayers / 2);
+                const totalScore = participatingPlayers.reduce((sum, p) => sum + p.mmr, 0);
+
                 const forcedA = participatingPlayers.filter(p => p.lock_team === 'A');
                 const forcedB = participatingPlayers.filter(p => p.lock_team === 'B');
                 const flexible = participatingPlayers.filter(p => p.lock_team === 'none' || !p.lock_team);
 
                 if (forcedA.length > 5 || forcedB.length > 5) throw new Error('고정 인원 초과');
 
+                // 🚨 같은 포지션이 3명 이상인지 사전에 검사
+                const roles = participatingPlayers.map(p => p.role).filter(r => r && r !== 'none');
+                const roleCounts = {};
+                for(const r of roles) {
+                    roleCounts[r] = (roleCounts[r] || 0) + 1;
+                    if (roleCounts[r] > 2) {
+                        throw new Error(`[${ROLE_NAMES[r]}] 포지션이 3명 이상이라 공평하게 나눌 수 없습니다!`);
+                    }
+                }
+
                 const needA = 5 - forcedA.length;
-                const totalScore = participatingPlayers.reduce((sum, p) => sum + p.mmr, 0);
                 const forcedASum = forcedA.reduce((sum, p) => sum + p.mmr, 0);
 
                 let bestDiff = Infinity;
                 let bestCombinations = [];
 
+                function getDuplicates(team) {
+                    const teamRoles = team.map(p => p.role).filter(r => r && r !== 'none');
+                    return new Set(teamRoles).size !== teamRoles.length;
+                }
+
                 function dfs(index, chosen, currentSum) {
                     if (chosen.length === needA) {
-                        const diff = Math.abs((forcedASum + currentSum) - (totalScore - (forcedASum + currentSum)));
-                        if (diff < bestDiff) { bestDiff = diff; bestCombinations = [[...forcedA, ...chosen]]; } 
-                        else if (diff === bestDiff) { bestCombinations.push([...forcedA, ...chosen]); }
+                        const teamA = [...forcedA, ...chosen];
+                        const teamB = participatingPlayers.filter(p => !teamA.some(a => a.id === p.id));
+                        
+                        // 🚨 핵심: A팀과 B팀 모두 포지션 중복이 없는 조합만 통과시킴
+                        if (!getDuplicates(teamA) && !getDuplicates(teamB)) {
+                            const diff = Math.abs((forcedASum + currentSum) - (totalScore - (forcedASum + currentSum)));
+                            if (diff < bestDiff) { 
+                                bestDiff = diff; 
+                                bestCombinations = [teamA]; 
+                            } 
+                            else if (diff === bestDiff) { 
+                                bestCombinations.push(teamA); 
+                            }
+                        }
                         return;
                     }
                     if (index >= flexible.length) return;
-                    chosen.push(flexible[index]); dfs(index + 1, chosen, currentSum + flexible[index].mmr);
+                    
+                    chosen.push(flexible[index]); 
+                    dfs(index + 1, chosen, currentSum + flexible[index].mmr);
                     chosen.pop();
-                    if (flexible.length - (index + 1) >= needA - chosen.length) dfs(index + 1, chosen, currentSum);
+                    
+                    if (flexible.length - (index + 1) >= needA - chosen.length) {
+                        dfs(index + 1, chosen, currentSum);
+                    }
                 }
 
                 dfs(0, [], 0);
-                if (bestCombinations.length === 0) throw new Error('조합 불가');
+                
+                if (bestCombinations.length === 0) throw new Error('A/B팀 고정 조건이나 포지션 분배 조건을 만족하는 팀 구성이 불가능합니다.');
 
                 const teamA = bestCombinations[Math.floor(Math.random() * bestCombinations.length)];
                 const teamB = participatingPlayers.filter(p => !teamA.some(a => a.id === p.id));
@@ -942,7 +1003,7 @@
                 await sb.from('players').update({ assigned_team: 'A' }).in('id', teamA.map(p => p.id));
                 await sb.from('players').update({ assigned_team: 'B' }).in('id', teamB.map(p => p.id));
                 
-                window.showToast(`공평한 매칭 완료! (차이: ${bestDiff}점)`, 'success');
+                window.showToast(`포지션 분배 및 매칭 완료! (차이: ${bestDiff}점)`, 'success');
             } catch (err) { window.showToast(err.message, 'error'); } 
             finally { btn.disabled = false; btn.innerHTML = '공평하게 팀 나누기'; }
         };
