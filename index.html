@@ -265,28 +265,29 @@
         .tier-platinum { color: #2dd4bf; } .tier-emerald { color: #34d399; } .tier-diamond { color: #38bdf8; } .tier-master { color: #c084fc; }
         .tier-grandmaster { color: #f472b6; } .tier-challenger { color: #fb7185; }
         /* ========== 레이아웃 (메인 + 챔피언 밴 사이드) ========== */
-        .app-layout { display: grid; grid-template-columns: 1fr 420px; gap: 20px; max-width: 1640px; margin: 0 auto; width: 100%; }
+        .app-layout { display: grid; grid-template-columns: 1fr 460px; gap: 20px; max-width: 1680px; margin: 0 auto; width: 100%; }
         @media (max-width: 1100px) { .app-layout { grid-template-columns: 1fr; } .ban-sidebar { position: static !important; max-height: none !important; } }
         .ban-sidebar { position: sticky; top: 20px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
         .ban-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 18px; border: 1px solid var(--border-color); display: flex; flex-direction: column; max-height: calc(100vh - 40px); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
         .ban-card h2 { margin: 0 0 14px; color: var(--text-main); font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px; }
-        .ban-controls { display: flex; gap: 8px; margin-bottom: 10px; }
-        .ban-controls input { flex: 1; padding: 10px 12px; font-size: 13px; }
-        .ban-controls .btn { padding: 10px 14px; font-size: 13px; }
-        .ban-stats { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .ban-controls { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+        .ban-controls input { flex: 1; min-width: 120px; padding: 10px 12px; font-size: 13px; }
+        .ban-controls .btn { padding: 10px 12px; font-size: 13px; }
+        .ban-controls .btn-active { background: var(--primary); color: white; }
+        .ban-stats { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; }
         .ban-stats b { color: var(--warning); font-weight: 700; }
         .ban-stats .ban-count { color: var(--danger); font-weight: 800; font-size: 14px; }
-        .champion-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; overflow-y: auto; flex: 1; padding-right: 6px; }
+        .champion-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; overflow-y: auto; flex: 1; padding-right: 6px; min-height: 200px; }
         .champion-grid::-webkit-scrollbar { width: 6px; }
         .champion-grid::-webkit-scrollbar-track { background: transparent; }
         .champion-grid::-webkit-scrollbar-thumb { background: var(--secondary); border-radius: 10px; }
-        .champ-tile { position: relative; aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; border: 2px solid transparent; background: var(--bg-base); transition: transform 0.15s, border-color 0.15s; }
+        .champ-tile { position: relative; aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; border: 2px solid transparent; background: var(--bg-base); transition: transform 0.12s, border-color 0.15s; }
         .champ-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .champ-tile:hover { transform: scale(1.08); border-color: var(--primary); z-index: 2; }
+        .champ-tile:hover { transform: scale(1.1); border-color: var(--primary); z-index: 3; }
         .champ-tile .champ-name { position: absolute; bottom: 0; left: 0; right: 0; font-size: 9px; text-align: center; background: rgba(15,23,42,0.85); color: #fff; padding: 1px 0; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
         .champ-tile.banned { border-color: var(--danger); }
         .champ-tile.banned img { filter: grayscale(1) brightness(0.35); }
-        .champ-tile.banned::after { content: '✖'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 900; color: var(--danger); text-shadow: 0 0 10px rgba(0,0,0,0.95); pointer-events: none; }
+        .champ-tile.banned::after { content: '✖'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; color: var(--danger); text-shadow: 0 0 10px rgba(0,0,0,0.95); pointer-events: none; }
         .champ-tile.placeholder { display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px; grid-column: 1 / -1; aspect-ratio: auto; padding: 30px; text-align: center; }
     </style>
 </head>
@@ -391,6 +392,7 @@
             <h2>🚫 챔피언 밴 (피어리스)</h2>
             <div class="ban-controls">
                 <input type="text" id="champSearch" placeholder="🔍 챔피언 검색..." autocomplete="off">
+                <button class="btn btn-secondary" id="banOnlyBtn" onclick="window.toggleBanOnly()" title="밴된 챔피언만 보기">🚫밴만</button>
                 <button class="btn btn-secondary" onclick="window.clearBanList()" title="밴 전체 해제">초기화</button>
             </div>
             <div class="ban-stats">
@@ -434,6 +436,7 @@
         let championList = [];
         let championVersion = '';
         let bannedChampions = new Set();
+        let showBanOnly = false;
         const BAN_STORAGE_KEY = 'lol_ban_champions_v1';
         const FALLBACK_VERSION = '14.14.1';
 
@@ -1089,11 +1092,21 @@
                 const cData = await cResp.json();
                 const data = cData.data || {};
 
-                championList = Object.keys(data).map(id => ({
-                    id: id,
-                    name: data[id].name,
-                    key: String(data[id].key)
-                })).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+                // id 기준 중복 제거 + 가장 정확한 이미지 파일명(image.full) 사용 → 옛날/겹침 초상화 문제 해결
+                const seen = new Set();
+                championList = [];
+                for (const id of Object.keys(data)) {
+                    if (seen.has(id)) continue;
+                    seen.add(id);
+                    const c = data[id];
+                    championList.push({
+                        id: id,
+                        name: c.name,
+                        key: String(c.key),
+                        img: (c.image && c.image.full) ? c.image.full : (id + '.png')
+                    });
+                }
+                championList.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
                 const totalEl = document.getElementById('champTotal');
                 if (totalEl) totalEl.textContent = championList.length;
@@ -1120,9 +1133,9 @@
             if (!grid || !championList.length) return;
 
             const q = (document.getElementById('champSearch')?.value || '').trim().toLowerCase();
-            const filtered = q
-                ? championList.filter(c => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q))
-                : championList;
+            let filtered = championList;
+            if (showBanOnly) filtered = filtered.filter(c => bannedChampions.has(c.id));
+            if (q) filtered = filtered.filter(c => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
 
             if (filtered.length === 0) {
                 grid.innerHTML = '<div class="champ-tile placeholder">검색 결과가 없습니다.</div>';
@@ -1131,8 +1144,8 @@
 
             grid.innerHTML = filtered.map(c => {
                 const isBanned = bannedChampions.has(c.id);
-                const img = `https://ddragon.leagueoflegends.com/cdn/${championVersion}/img/champion/${c.id}.png`;
-                return `<div class="champ-tile ${isBanned ? 'banned' : ''}" data-champ-id="${c.id}" title="${escapeHtml(c.name)}" onclick="window.toggleBan('${c.id}')">
+                const img = `https://ddragon.leagueoflegends.com/cdn/${championVersion}/img/champion/${c.img}`;
+                return `<div class="champ-tile ${isBanned ? 'banned' : ''}" data-champ-id="${c.id}" title="${escapeHtml(c.name)} (${c.id})" onclick="window.toggleBan('${c.id}')">
                     <img src="${img}" alt="${escapeHtml(c.name)}" loading="lazy" onerror="this.style.opacity=0.2">
                     <span class="champ-name">${escapeHtml(c.name)}</span>
                 </div>`;
@@ -1155,6 +1168,13 @@
             const tile = document.querySelector(`.champ-tile[data-champ-id="${champId}"]`);
             if (tile) tile.classList.toggle('banned');
             updateBanStats();
+        };
+
+        window.toggleBanOnly = function() {
+            showBanOnly = !showBanOnly;
+            const btn = document.getElementById('banOnlyBtn');
+            if (btn) btn.classList.toggle('btn-active', showBanOnly);
+            renderChampionGrid();
         };
 
         window.clearBanList = function() {
