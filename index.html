@@ -162,9 +162,37 @@
         .participant-list-container::-webkit-scrollbar { width: 6px; }
         .participant-list-container::-webkit-scrollbar-track { background: #0f0f23; border-radius: 3px; }
         .participant-list-container::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+
+        /* ========== 챔피언 밴(피어리스) 사이드 패널 ========== */
+        .app-layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; align-items: start; max-width: 1600px; margin: 0 auto; }
+        @media (max-width: 1100px) { .app-layout { grid-template-columns: 1fr; } .ban-sidebar { position: static !important; max-height: none !important; } }
+        .ban-sidebar { position: sticky; top: 20px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
+        .ban-card { background: #16213e; border-radius: 12px; padding: 16px; border: 1px solid #0f3460; display: flex; flex-direction: column; min-height: 600px; }
+        .ban-card h2 { margin: 0 0 10px; color: #e94560; border-bottom: 1px solid #0f3460; padding-bottom: 8px; font-size: 18px; }
+        .ban-controls { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+        .ban-controls input { flex: 1; min-width: 120px; padding: 8px 10px; border: 1px solid #0f3460; background: #0f0f23; color: #eee; border-radius: 6px; font-size: 13px; }
+        .ban-controls .btn { padding: 8px 12px; font-size: 13px; }
+        .ban-stats { font-size: 12px; color: #aaa; margin-bottom: 8px; }
+        .ban-stats b { color: #f0c808; }
+        .champion-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; overflow-y: auto; padding-right: 4px; flex: 1; }
+        .champion-grid::-webkit-scrollbar { width: 6px; }
+        .champion-grid::-webkit-scrollbar-track { background: #0f0f23; border-radius: 3px; }
+        .champion-grid::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+        .champ-tile { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; cursor: pointer; border: 2px solid transparent; background: #0f0f23; transition: transform 0.15s, border-color 0.15s; }
+        .champ-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .champ-tile:hover { transform: scale(1.06); border-color: #e94560; z-index: 2; }
+        .champ-tile .champ-name { position: absolute; bottom: 0; left: 0; right: 0; font-size: 9px; text-align: center; background: rgba(0,0,0,0.7); color: #fff; padding: 1px 0; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .champ-tile.banned { border-color: #e74c3c; }
+        .champ-tile.banned img { filter: grayscale(1) brightness(0.4); }
+        .champ-tile.banned::after {
+            content: '✖'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            font-size: 28px; font-weight: 900; color: #e74c3c; text-shadow: 0 0 8px rgba(0,0,0,0.9); pointer-events: none;
+        }
+        .champ-tile.loading-box { display: flex; align-items: center; justify-content: center; color: #888; font-size: 11px; grid-column: 1 / -1; aspect-ratio: auto; padding: 20px; }
     </style>
 </head>
 <body>
+   <div class="app-layout">
     <div class="container">
         <h1>🎮 LoL 5v5 팀 매칭 & 전적 검색</h1>
         
@@ -295,6 +323,23 @@
         </div>
     </div>
 
+    <!-- ========== 챔피언 밴(피어리스) 사이드 패널 ========== -->
+    <aside class="ban-sidebar">
+        <div class="ban-card">
+            <h2>🚫 챔피언 밴 (피어리스)</h2>
+            <div class="ban-controls">
+                <input type="text" id="champSearch" placeholder="🔍 챔피언 검색..." autocomplete="off">
+                <button class="btn btn-secondary" onclick="window.clearBanList()" title="밴 전체 해제">초기화</button>
+            </div>
+            <div class="ban-stats" id="banStats"> 밴된 챔피언: <b>0</b> / 전체 <b id="champTotal">0</b></div>
+            <div class="champion-grid" id="championGrid">
+                <div class="champ-tile loading-box">챔피언 목록 로드 중...</div>
+            </div>
+            <p class="muted" style="margin: 8px 0 0; font-size: 11px;">💡 챔피언 초상화를 클릭하면 ✖ 표시와 함께 사용 불가(밴) 처리됩니다. 다시 클릭하면 해제됩니다. (라이엇 API 미사용, Data Dragon CDN)</p>
+        </div>
+    </aside>
+   </div>
+
     <div class="modal-overlay" id="editModal">
         <div class="modal">
             <h3>✏️ MMR 수정</h3>
@@ -314,6 +359,13 @@
         let participatingPlayers = [];
         let currentSummonerData = null; 
         let linkingInProgress = new Set(); // 중복 연동 요청 방지
+
+        // ========== 챔피언 밴(피어리스) 전역 ==========
+        let championList = [];        // [{id, name, key}]
+        let championVersion = '';     // Data Dragon 버전
+        let bannedChampions = new Set(); // 밴된 챔피언 id 집합 (localStorage 영속)
+        const BAN_STORAGE_KEY = 'lol_ban_champions';
+        const FALLBACK_VERSION = '14.14.1';
 
         // ========== 티어/랭크 기반 MMR 계산 함수 ==========
         /**
@@ -371,6 +423,9 @@
                 subscribeToChanges();
                 await loadPlayers();
                 window.updateStatus('connected', '연결됨 - 실시간 동기화 활성화');
+                // 챔피언 밴 패널 초기화 (Supabase 와 무관, Data Dragon CDN)
+                loadBanState();
+                loadChampions();
             } catch (err) {
                 console.error('초기화 실패:', err);
                 window.updateStatus('error', '연결 실패: ' + err.message);
@@ -459,7 +514,7 @@
                             <span class="riot-link-label">🔗 라이엇 연결:</span>
                             <input type="text" class="riot-gn" data-player-id="${p.id}" placeholder="게임명 (예: Hide on bush)" autocomplete="off">
                             <input type="text" class="riot-tl" data-player-id="${p.id}" placeholder="KR1" maxlength="5">
-                            <button onclick="window.handleLinkClick('${p.id}')" id="linkBtn-${p.id}">계정 연결</button>
+                            <button onclick="window.linkRiotAccount('${p.id}')" id="linkBtn-${p.id}">계정 연결</button>
                         </div>
                     ` : ''}
                 </li>
@@ -1251,6 +1306,123 @@
         });
         document.getElementById('tagLine').addEventListener('keypress', (e) => { 
             if (e.key === 'Enter') window.searchSummoner(); 
+        });
+
+        // ========== 챔피언 밴(피어리스) 함수들 ==========
+        /**
+         * Data Dragon CDN에서 전체 챔피언 목록을 로드.
+         * - /api/versions.json → 최신 버전
+         * - /cdn/<ver>/data/ko_KR/champion.json → 챔피언 메타데이터
+         * - 라이엇 API 키 불필요 (공개 CDN)
+         * 초상화 URL: https://ddragon.leagueoflegends.com/cdn/<ver>/img/champion/<id>.png
+         */
+        async function loadChampions() {
+            const grid = document.getElementById('championGrid');
+            try {
+                // 1. 최신 버전
+                const vResp = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
+                if (vResp.ok) {
+                    const versions = await vResp.json();
+                    if (Array.isArray(versions) && versions.length > 0) championVersion = versions[0];
+                }
+                if (!championVersion) championVersion = FALLBACK_VERSION;
+
+                // 2. 챔피언 메타데이터 (한국어 이름)
+                const cResp = await fetch(`https://ddragon.leagueoflegends.com/cdn/${championVersion}/data/ko_KR/champion.json`);
+                if (!cResp.ok) throw new Error('챔피언 데이터 로드 실패');
+                const cData = await cResp.json();
+                const data = cData.data || {};
+
+                championList = Object.keys(data).map(id => ({
+                    id: id,                       // Data Dragon 챔피언 키 (예: "Aatrox")
+                    name: data[id].name,          // 한국어 이름(예: "아트록스")
+                    key: String(data[id].key)     // 숫자 키
+                })).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+                document.getElementById('champTotal').textContent = championList.length;
+                renderChampionGrid();
+            } catch (err) {
+                console.error('챔피언 로드 실패:', err);
+                grid.innerHTML = '<div class="champ-tile loading-box">챔피언 목록을 불러오지 못했습니다. 새로고침 해주세요.</div>';
+            }
+        }
+
+        // localStorage에서 밴 상태 복원
+        function loadBanState() {
+            try {
+                const raw = localStorage.getItem(BAN_STORAGE_KEY);
+                if (raw) bannedChampions = new Set(JSON.parse(raw));
+            } catch (e) { console.warn('밴 상태 로드 실패:', e); bannedChampions = new Set(); }
+        }
+
+        // localStorage에 밴 상태 저장
+        function saveBanState() {
+            try {
+                localStorage.setItem(BAN_STORAGE_KEY, JSON.stringify([...bannedChampions]));
+            } catch (e) { console.warn('밴 상태 저장 실패:', e); }
+        }
+
+        // 검색 필터 반영하여 그리드 렌더링
+        function renderChampionGrid() {
+            const grid = document.getElementById('championGrid');
+            if (!grid) return;
+            if (!championList.length) { return; }
+
+            const q = (document.getElementById('champSearch')?.value || '').trim().toLowerCase();
+            const filtered = q
+                ? championList.filter(c => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q))
+                : championList;
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div class="champ-tile loading-box">검색 결과가 없습니다.</div>';
+                return;
+            }
+
+            grid.innerHTML = filtered.map(c => {
+                const isBanned = bannedChampions.has(c.id);
+                const img = `https://ddragon.leagueoflegends.com/cdn/${championVersion}/img/champion/${c.id}.png`;
+                return `<div class="champ-tile ${isBanned ? 'banned' : ''}" data-champ-id="${c.id}" title="${escapeHtml(c.name)}" onclick="window.toggleBan('${c.id}')">
+                    <img src="${img}" alt="${escapeHtml(c.name)}" loading="lazy" onerror="this.style.opacity=0.2">
+                    <span class="champ-name">${escapeHtml(c.name)}</span>
+                </div>`;
+            }).join('');
+
+            updateBanStats();
+        }
+
+        function updateBanStats() {
+            const stats = document.getElementById('banStats');
+            if (stats) stats.innerHTML = ` 밴된 챔피언: <b>${bannedChampions.size}</b> / 전체 <b id="champTotal">${championList.length}</b>`;
+        }
+
+        // 챔피언 밴 토글
+        window.toggleBan = function(champId) {
+            if (bannedChampions.has(champId)) {
+                bannedChampions.delete(champId);
+            } else {
+                bannedChampions.add(champId);
+            }
+            saveBanState();
+            // 해당 타일만 클래스 토글 (전체 리렌더 최소화)
+            const tile = document.querySelector(`.champ-tile[data-champ-id="${champId}"]`);
+            if (tile) tile.classList.toggle('banned');
+            updateBanStats();
+        };
+
+        // 밴 전체 해제
+        window.clearBanList = function() {
+            if (bannedChampions.size === 0) return window.showToast('밴된 챔피언이 없습니다.', 'info');
+            if (!confirm('밴된 챔피언을 모두 해제하시겠습니까?')) return;
+            bannedChampions.clear();
+            saveBanState();
+            renderChampionGrid();
+            window.showToast('밴 목록이 초기화되었습니다.', 'success');
+        };
+
+        // 검색 입력 시 즉시 필터
+        document.addEventListener('DOMContentLoaded', () => {
+            const cs = document.getElementById('champSearch');
+            if (cs) cs.addEventListener('input', renderChampionGrid);
         });
     </script>
 </body>
