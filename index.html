@@ -264,55 +264,27 @@
         .tier-iron { color: #a19d94; } .tier-bronze { color: #cd7f32; } .tier-silver { color: #94a3b8; } .tier-gold { color: #fbbf24; }
         .tier-platinum { color: #2dd4bf; } .tier-emerald { color: #34d399; } .tier-diamond { color: #38bdf8; } .tier-master { color: #c084fc; }
         .tier-grandmaster { color: #f472b6; } .tier-challenger { color: #fb7185; }
-
         /* ========== 레이아웃 (메인 + 챔피언 밴 사이드) ========== */
         .app-layout { display: grid; grid-template-columns: 1fr 460px; gap: 20px; max-width: 1680px; margin: 0 auto; width: 100%; }
         @media (max-width: 1100px) { .app-layout { grid-template-columns: 1fr; } .ban-sidebar { position: static !important; max-height: none !important; } }
-        .ban-sidebar { position: sticky; top: 20px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
-        .ban-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 18px; border: 1px solid var(--border-color); display: flex; flex-direction: column; max-height: calc(100vh - 40px); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-        .ban-card h2 { margin: 0 0 14px; color: var(--text-main); font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px; }
-        .ban-controls { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-        .ban-controls input { flex: 1; min-width: 120px; padding: 10px 12px; font-size: 13px; }
+        .ban-sidebar { position: sticky; top: 20px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; min-height: 0; }
+        .ban-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 16px; border: 1px solid var(--border-color); display: flex; flex-direction: column; max-height: calc(100vh - 40px); min-height: 0; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .ban-card h2 { margin: 0 0 12px; color: var(--text-main); font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; flex-shrink: 0; }
+        .ban-controls { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; flex-shrink: 0; }
+        .ban-controls input { flex: 1; min-width: 110px; padding: 10px 12px; font-size: 13px; }
         .ban-controls .btn { padding: 10px 12px; font-size: 13px; }
         .ban-controls .btn-active { background: var(--primary); color: white; }
-        .ban-stats { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; }
+        .ban-stats { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
         .ban-stats b { color: var(--warning); font-weight: 700; }
         .ban-stats .ban-count { color: var(--danger); font-weight: 800; font-size: 14px; }
-        
-        /* 🔥 챔피언 그리드: 높이 제한, 스크롤링, 호떡 방지 완벽 대응 */
-        .champion-grid { 
-            display: grid; 
-            /* 화면 너비에 맞춰서 유동적으로 자동 배치되게끔 픽스 (6열 고정 해제) */
-            grid-template-columns: repeat(auto-fill, minmax(45px, 1fr)); 
-            align-content: start; /* 세로 늘어남 방지 */
-            gap: 5px; 
-            overflow-y: auto; 
-            flex: 1; 
-            padding-right: 6px; 
-            min-height: 200px; 
-            max-height: 400px; /* 🔥 스크롤을 만들기 위한 핵심: 높이 제한 */
-        }
+        /* 그리드: 명시적 높이 제약 + 세로 스크롤 보장, 남은 공간 차지 */
+        .champion-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; min-height: 0; max-height: 100%; padding-right: 6px; align-content: start; }
         .champion-grid::-webkit-scrollbar { width: 6px; }
         .champion-grid::-webkit-scrollbar-track { background: transparent; }
         .champion-grid::-webkit-scrollbar-thumb { background: var(--secondary); border-radius: 10px; }
-        
-        .champ-tile { 
-            position: relative; 
-            width: 100%;
-            aspect-ratio: 1 / 1; /* 🔥 호떡 찌그러짐 방지: 무조건 1:1 비율 고정 */
-            border-radius: var(--radius-sm); 
-            overflow: hidden; 
-            cursor: pointer; 
-            border: 2px solid transparent; 
-            background: var(--bg-base); 
-            transition: transform 0.12s, border-color 0.15s; 
-        }
-        .champ-tile img { 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; /* 🔥 빈 공간 없이 꽉 차게 */
-            display: block; 
-        }
+        /* 타일: 절대 1:1 정사각형 강제, 찌그러짐 방지 */
+        .champ-tile { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; border: 2px solid transparent; background: var(--bg-base); transition: transform 0.12s, border-color 0.15s; break-inside: avoid; }
+        .champ-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
         .champ-tile:hover { transform: scale(1.1); border-color: var(--primary); z-index: 3; }
         .champ-tile .champ-name { position: absolute; bottom: 0; left: 0; right: 0; font-size: 9px; text-align: center; background: rgba(15,23,42,0.85); color: #fff; padding: 1px 0; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
         .champ-tile.banned { border-color: var(--danger); }
@@ -322,120 +294,120 @@
     </style>
 </head>
 <body>
-    <div class="app-layout">
-        <div class="container">
-            <h1>LoL 5v5 매치메이커</h1>
-            
-            <div class="status-bar">
-                <div class="status-item">
-                    <span class="status-dot" id="statusDot"></span>
-                    <span id="statusText">서버 연결 중...</span>
+   <div class="app-layout">
+    <div class="container">
+        <h1>LoL 5v5 매치메이커</h1>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">서버 연결 중...</span>
+            </div>
+            <div class="status-item">
+                <span id="participantCount" style="color: var(--primary); font-weight: 700; background: rgba(99,102,241,0.1); padding: 4px 10px; border-radius: 12px;">참가자: 0 / 10</span>
+            </div>
+        </div>
+
+        <div class="section-row">
+            <!-- 1. 전체 명단 카드 -->
+            <div class="card fixed-height-card">
+                <h2>👥 전체 대기 명단</h2>
+                
+                <div class="input-row">
+                    <input type="text" id="playerName" placeholder="플레이어 이름">
+                    <input type="number" id="playerMmr" placeholder="MMR" value="1200">
+                    <button class="btn btn-secondary" onclick="addPlayer()">수동 추가</button>
                 </div>
-                <div class="status-item">
-                    <span id="participantCount" style="color: var(--primary); font-weight: 700; background: rgba(99,102,241,0.1); padding: 4px 10px; border-radius: 12px;">참가자: 0 / 10</span>
+                
+                <details>
+                    <summary>📋 일괄 등록 (이름 MMR 형식)</summary>
+                    <textarea id="bulkData" placeholder="플레이어1 1200&#10;플레이어2 1450"></textarea>
+                    <button class="btn btn-secondary" style="width: 100%;" onclick="bulkAddPlayers()">목록 등록하기</button>
+                </details>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                    <span style="font-size: 13px; color: var(--text-muted);">명단 관리 (➕로 참가)</span>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="syncAllTiers()">🔄 티어 일괄 갱신</button>
+                </div>
+                
+                <div class="scroll-container" id="playerListContainer">
+                    <ul class="player-list" id="playerList"></ul>
                 </div>
             </div>
 
-            <div class="section-row">
-                <!-- 1. 전체 명단 카드 -->
-                <div class="card fixed-height-card">
-                    <h2>👥 전체 대기 명단</h2>
-                    
-                    <div class="input-row">
-                        <input type="text" id="playerName" placeholder="플레이어 이름">
-                        <input type="number" id="playerMmr" placeholder="MMR" value="1200">
-                        <button class="btn btn-secondary" onclick="addPlayer()">수동 추가</button>
+            <!-- 2. 매칭 참가자 카드 -->
+            <div class="card fixed-height-card">
+                <h2>⚔️ 매칭 참가자</h2>
+                
+                <details>
+                    <summary>📋 이름으로 참가자 일괄 추가</summary>
+                    <textarea id="bulkParticipants" placeholder="플레이어1, 플레이어2"></textarea>
+                    <button class="btn btn-secondary" style="width: 100%;" onclick="bulkAddToMatch()">참가자 넘기기</button>
+                </details>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                    <div style="font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; align-items: center;">
+                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--team-a);"></span> A팀
+                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--team-b);"></span> B팀
                     </div>
-                    
-                    <details>
-                        <summary>📋 일괄 등록 (이름 MMR 형식)</summary>
-                        <textarea id="bulkData" placeholder="플레이어1 1200&#10;플레이어2 1450"></textarea>
-                        <button class="btn btn-secondary" style="width: 100%;" onclick="bulkAddPlayers()">목록 등록하기</button>
-                    </details>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
-                        <span style="font-size: 13px; color: var(--text-muted);">명단 관리 (➕로 참가)</span>
-                        <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="syncAllTiers()">🔄 티어 일괄 갱신</button>
-                    </div>
-                    
-                    <div class="scroll-container" id="playerListContainer">
-                        <ul class="player-list" id="playerList"></ul>
-                    </div>
+                    <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="clearAllParticipants()">전체 비우기</button>
                 </div>
-
-                <!-- 2. 매칭 참가자 카드 -->
-                <div class="card fixed-height-card">
-                    <h2>⚔️ 매칭 참가자</h2>
-                    
-                    <details>
-                        <summary>📋 이름으로 참가자 일괄 추가</summary>
-                        <textarea id="bulkParticipants" placeholder="플레이어1, 플레이어2"></textarea>
-                        <button class="btn btn-secondary" style="width: 100%;" onclick="bulkAddToMatch()">참가자 넘기기</button>
-                    </details>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
-                        <div style="font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; align-items: center;">
-                            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--team-a);"></span> A팀
-                            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--team-b);"></span> B팀
-                        </div>
-                        <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="clearAllParticipants()">전체 비우기</button>
-                    </div>
-                    
-                    <div class="scroll-container" id="participantListContainer">
-                        <ul class="player-list" id="participantList"></ul>
-                    </div>
-                    
-                    <div style="margin-top: 15px; text-align: center; flex-shrink: 0;">
-                        <button class="btn btn-primary" style="padding: 14px; font-size: 16px; width: 100%;" id="makeTeamsBtn" onclick="makeTeams()" disabled>
-                            ⚖️ 공평하게 팀 나누기
-                        </button>
-                        <p id="makeTeamsMsg" class="muted" style="margin-top: 10px;">참가자가 10명일 때 활성화됩니다.</p>
-                    </div>
+                
+                <div class="scroll-container" id="participantListContainer">
+                    <ul class="player-list" id="participantList"></ul>
                 </div>
-            </div>
-
-            <!-- 3. 결과 카드 -->
-            <div class="card">
-                <h2>🏆 팀 배정 결과</h2>
-                <div class="teams-section">
-                    <div class="team-box team-a">
-                        <div class="team-header">
-                            <h3 class="team-title a"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--team-a);"></span> A팀</h3>
-                            <div class="team-score" id="scoreA">0</div>
-                        </div>
-                        <ul class="team-players" id="listA"><li class="muted" style="text-align:center; padding:20px;">팀을 나누어 주세요</li></ul>
-                    </div>
-                    <div class="team-box team-b">
-                        <div class="team-header">
-                            <h3 class="team-title b"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--team-b);"></span> B팀</h3>
-                            <div class="team-score" id="scoreB">0</div>
-                        </div>
-                        <ul class="team-players" id="listB"><li class="muted" style="text-align:center; padding:20px;">팀을 나누어 주세요</li></ul>
-                    </div>
+                
+                <div style="margin-top: 15px; text-align: center; flex-shrink: 0;">
+                    <button class="btn btn-primary" style="padding: 14px; font-size: 16px; width: 100%;" id="makeTeamsBtn" onclick="makeTeams()" disabled>
+                        ⚖️ 공평하게 팀 나누기
+                    </button>
+                    <p id="makeTeamsMsg" class="muted" style="margin-top: 10px;">참가자가 10명일 때 활성화됩니다.</p>
                 </div>
             </div>
         </div>
 
-        <!-- ========== 챔피언 밴(피어리스) 사이드 패널 ========== -->
-        <aside class="ban-sidebar">
-            <div class="ban-card">
-                <h2>🚫 챔피언 밴 (피어리스)</h2>
-                <div class="ban-controls">
-                    <input type="text" id="champSearch" placeholder="🔍 챔피언 검색..." autocomplete="off">
-                    <button class="btn btn-secondary" id="banOnlyBtn" onclick="window.toggleBanOnly()" title="밴된 챔피언만 보기">🚫밴만</button>
-                    <button class="btn btn-secondary" onclick="window.clearBanList()" title="밴 전체 해제">초기화</button>
+        <!-- 3. 결과 카드 -->
+        <div class="card">
+            <h2>🏆 팀 배정 결과</h2>
+            <div class="teams-section">
+                <div class="team-box team-a">
+                    <div class="team-header">
+                        <h3 class="team-title a"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--team-a);"></span> A팀</h3>
+                        <div class="team-score" id="scoreA">0</div>
+                    </div>
+                    <ul class="team-players" id="listA"><li class="muted" style="text-align:center; padding:20px;">팀을 나누어 주세요</li></ul>
                 </div>
-                <div class="ban-stats">
-                    <span>밴 <b class="ban-count" id="banCount">0</b> / 전체 <b id="champTotal">0</b></span>
-                    <span style="color: var(--text-muted); font-size: 11px;">한 번 쓴 챔피언은 ✖</span>
+                <div class="team-box team-b">
+                    <div class="team-header">
+                        <h3 class="team-title b"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--team-b);"></span> B팀</h3>
+                        <div class="team-score" id="scoreB">0</div>
+                    </div>
+                    <ul class="team-players" id="listB"><li class="muted" style="text-align:center; padding:20px;">팀을 나누어 주세요</li></ul>
                 </div>
-                <div class="champion-grid" id="championGrid">
-                    <div class="champ-tile placeholder">챔피언 목록 로드 중...</div>
-                </div>
-                <p class="muted" style="margin: 10px 0 0; font-size: 11px; text-align: center;">💡 초상화 클릭 → ✖ 사용 불가 / 재클릭 → 해제<br>(Data Dragon CDN, 라이엇 API 키 미사용)</p>
             </div>
-        </aside>
+        </div>
     </div>
+
+    <!-- ========== 챔피언 밴(피어리스) 사이드 패널 ========== -->
+    <aside class="ban-sidebar">
+        <div class="ban-card">
+            <h2>🚫 챔피언 밴 (피어리스)</h2>
+            <div class="ban-controls">
+                <input type="text" id="champSearch" placeholder="🔍 챔피언 검색..." autocomplete="off">
+                <button class="btn btn-secondary" id="banOnlyBtn" onclick="window.toggleBanOnly()" title="밴된 챔피언만 보기">🚫밴만</button>
+                <button class="btn btn-secondary" onclick="window.clearBanList()" title="밴 전체 해제">초기화</button>
+            </div>
+            <div class="ban-stats">
+                <span>밴 <b class="ban-count" id="banCount">0</b> / 전체 <b id="champTotal">0</b></span>
+                <span style="color: var(--text-muted); font-size: 11px;">한 번 쓴 챔피언은 ✖</span>
+            </div>
+            <div class="champion-grid" id="championGrid">
+                <div class="champ-tile placeholder">챔피언 목록 로드 중...</div>
+            </div>
+            <p class="muted" style="margin: 10px 0 0; font-size: 11px; text-align: center;">💡 초상화 클릭 → ✖ 사용 불가 / 재클릭 → 해제<br>(Data Dragon CDN, 라이엇 API 키 미사용)</p>
+        </div>
+    </aside>
+   </div>
 
     <!-- 모달 -->
     <div class="modal-overlay" id="editModal">
@@ -513,7 +485,7 @@
                 subscribeToChanges();
                 await loadPlayers();
                 window.updateStatus('connected', '연결됨 - 실시간 동기화 중');
-                // 챔피언 밴 패널 초기화
+                // 챔피언 밴 패널 초기화 (Data Dragon CDN, Supabase 무관)
                 loadBanState();
                 loadChampions();
             } catch (err) {
@@ -588,6 +560,7 @@
             updateMakeTeamsButton();
         }
 
+        // 🔥 HTML 구조 생성 (가로 밀착형 압축 레이아웃 + 포지션 기능 추가)
         function playerItemHTML(p, isParticipant = false, index = 0) {
             const indexSpan = isParticipant ? `<span style="color:var(--text-muted); font-weight:bold; min-width:18px; font-size:13px; flex-shrink:0;">${index}.</span>` : '';
             const avatar = p.profile_icon_id !== null 
@@ -615,6 +588,7 @@
                 ? `<button class="btn-icon mini ${p.is_locked ? 'btn-lock' : 'btn-unlock'}" onclick="window.toggleMmrLock('${p.id}', ${p.is_locked}, ${p.mmr})" title="점수 고정">${p.is_locked ? '🔒' : '🔓'}</button>` 
                 : '';
 
+            // 🔥 우측 패널 콤보박스들 (포지션 선택 + 팀 고정)
             const roleSelect = `
                 <select class="lock-select mini-select" onchange="window.updateRole('${p.id}', this.value)" title="포지션 지정">
                     <option value="none" ${!p.role || p.role === 'none' ? 'selected' : ''}>포지션 자유</option>
@@ -1030,6 +1004,7 @@
 
                 if (forcedA.length > 5 || forcedB.length > 5) throw new Error('고정 인원 초과');
 
+                // 🚨 같은 포지션이 3명 이상인지 사전에 검사
                 const roles = participatingPlayers.map(p => p.role).filter(r => r && r !== 'none');
                 const roleCounts = {};
                 for(const r of roles) {
@@ -1055,6 +1030,7 @@
                         const teamA = [...forcedA, ...chosen];
                         const teamB = participatingPlayers.filter(p => !teamA.some(a => a.id === p.id));
                         
+                        // 🚨 핵심: A팀과 B팀 모두 포지션 중복이 없는 조합만 통과시킴
                         if (!getDuplicates(teamA) && !getDuplicates(teamB)) {
                             const diff = Math.abs((forcedASum + currentSum) - (totalScore - (forcedASum + currentSum)));
                             if (diff < bestDiff) { 
@@ -1093,7 +1069,16 @@
             finally { btn.disabled = false; btn.innerHTML = '공평하게 팀 나누기'; }
         };
 
+        document.addEventListener('DOMContentLoaded', init);
+        document.getElementById('editModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) window.closeModal(); });
+
         // ========== 챔피언 밴(피어리스) 함수들 ==========
+        /**
+         * Data Dragon CDN에서 전체 챔피언 목록 로드 (라이엇 API 키 불필요)
+         * 1) /api/versions.json → 최신 버전
+         * 2) /cdn/<ver>/data/ko_KR/champion.json → 챔피언 메타데이터(한국어 이름)
+         * 초상화: https://ddragon.leagueoflegends.com/cdn/<ver>/img/champion/<id>.png
+         */
         async function loadChampions() {
             const grid = document.getElementById('championGrid');
             try {
@@ -1109,19 +1094,21 @@
                 const cData = await cResp.json();
                 const data = cData.data || {};
 
-                // 🔥 [핵심 추가] 챔피언 이름 기준으로 중복 완벽 제거 (과거 데이터 덮어쓰기)
-                const uniqueMap = new Map();
+                // 한국어 이름(name) 기준 중복 제거 (Map 활용) + 가장 정확한 이미지 파일명(image.full) 사용
+                // → 구버전/겹침 데이터(예: 시비르 2개) 완벽 차단, 현재 버전 1개만 유지
+                const byName = new Map();
                 for (const id of Object.keys(data)) {
                     const c = data[id];
-                    uniqueMap.set(c.name, {
+                    const korName = c.name || id;
+                    if (byName.has(korName)) continue;
+                    byName.set(korName, {
                         id: id,
-                        name: c.name,
+                        name: korName,
                         key: String(c.key),
                         img: (c.image && c.image.full) ? c.image.full : (id + '.png')
                     });
                 }
-                
-                championList = Array.from(uniqueMap.values());
+                championList = Array.from(byName.values());
                 championList.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
                 const totalEl = document.getElementById('champTotal');
